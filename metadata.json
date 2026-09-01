@@ -1,0 +1,6 @@
+{
+  "name": "Suggest Key",
+  "description": "A category-first 1:1 advisory marketplace connecting seekers with verified mentors for focused conversations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
