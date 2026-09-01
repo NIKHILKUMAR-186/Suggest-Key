@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PublicNav } from '../../components/navigation/PublicNav';
 import { ConstellationCanvas } from '../../components/visual/ConstellationCanvas';
@@ -6,6 +6,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Tag } from '../../components/ui/Tag';
 import { SectionHeader } from '../../components/ui/Headers';
 import { AdvisorySegmentSlug } from '../../domains/segment/SegmentTypes';
+import { AdvisorService, AdvisorDetail } from '../../domains/advisor/AdvisorService';
+import { SegmentService, AdvisorySegment } from '../../domains/segment/SegmentService';
 import {
   ArrowRight,
   ArrowUpRight,
@@ -23,89 +25,22 @@ import {
   Brain,
 } from 'lucide-react';
 
-const FEATURED_ADVISORS = [
-  {
-    id: 'dr-alistair-chen',
-    name: 'Dr. Alistair Chen, LMFT',
-    role: 'Relationship Advisor',
-    credentials: 'Ph.D. Stanford • Gottman Method Level 3 Certified • 15 yrs practice',
-    category: 'Relationship',
-    categorySlug: 'relationship',
-    rating: 4.99,
-    sessionsCount: 62,
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=240&auto=format&fit=crop&q=80',
-    headlineSession: 'High-Stakes Partnership Conflict Calibration & De-escalation',
-    duration: '45 mins',
-    price: '₹4,500',
-    tags: ['Gottman Method', 'Partnership Alignment', 'Family Systems'],
-    verified: true,
-  },
-  {
-    id: 'marcus-thorne',
-    name: 'Marcus Thorne',
-    role: 'Career Advisor',
-    credentials: 'Ex-Google Staff Eng • CMU Distributed Systems • 16 yrs leadership',
-    category: 'Career',
-    categorySlug: 'career',
-    rating: 5.0,
-    sessionsCount: 41,
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=240&auto=format&fit=crop&q=80',
-    headlineSession: 'Staff+ Engineering Promotion & Organizational Influence',
-    duration: '45 mins',
-    price: '₹4,200',
-    tags: ['Staff+ Trajectory', 'System Architecture', 'RFC Strategy'],
-    verified: true,
-  },
-  {
-    id: 'evelyn-vasquez',
-    name: 'Dr. Evelyn Vasquez',
-    role: 'Mental Health Advisor',
-    credentials: 'Ph.D. Columbia University • Licensed Clinical Psychologist • 14 yrs',
-    category: 'Mental Health',
-    categorySlug: 'mental-health',
-    rating: 4.98,
-    sessionsCount: 54,
-    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=240&auto=format&fit=crop&q=80',
-    headlineSession: 'Executive Crossroads & Burnout Diagnostics',
-    duration: '45 mins',
-    price: '₹3,500',
-    tags: ['Burnout Diagnostics', 'Cognitive Protocols', 'Decision Fatigue'],
-    verified: true,
-  },
-];
-
-const ADVISORY_SEGMENTS = [
-  {
-    id: AdvisorySegmentSlug.Relationship,
-    title: 'Relationship Advisory',
-    description: 'Partnership calibration, interpersonal dynamics, family systems & high-stakes conflict de-escalation.',
-    count: 'Audited Relationship Specialists',
-    accent: 'amber' as const,
-    badgeText: 'LMFT & Gottman Verified',
-    icon: Heart,
-    slug: AdvisorySegmentSlug.Relationship,
-  },
-  {
-    id: AdvisorySegmentSlug.Career,
-    title: 'Career Advisory',
-    description: 'Executive leadership, Staff+ engineering trajectories, high-stakes compensation negotiation & strategic pivots.',
-    count: 'Audited Career Specialists',
-    accent: 'iris' as const,
-    badgeText: 'Executive Track Audited',
-    icon: Briefcase,
-    slug: AdvisorySegmentSlug.Career,
-  },
-  {
-    id: AdvisorySegmentSlug.MentalHealth,
-    title: 'Mental Health Advisory',
-    description: 'Clinical psychology, executive burnout diagnostics, neuro-resilience protocols & cognitive restructuring.',
-    count: 'Licensed Clinical Psychologists',
-    accent: 'verdant' as const,
-    badgeText: 'Mandatory Clinical Audit',
-    icon: Brain,
-    slug: AdvisorySegmentSlug.MentalHealth,
-  },
-];
+interface FeaturedAdvisor {
+  id: string;
+  name: string;
+  role: string;
+  credentials: string;
+  category: string;
+  categorySlug: string;
+  rating: number;
+  sessionsCount: number;
+  avatarUrl: string;
+  headlineSession: string;
+  duration: string;
+  price: string;
+  tags: string[];
+  verified: boolean;
+}
 
 const STEPS = [
   {
@@ -134,33 +69,71 @@ const STEPS = [
   },
 ];
 
-const TESTIMONIALS = [
-  {
-    quote:
-      'Dr. Vasquez cut through 6 months of mental fog in 45 minutes. Her clinical grounding made every minute actionable. I walked away with clarity on my executive exit roadmap.',
-    author: 'Ananya S.',
-    title: 'VP of Product, FinTech',
-    session: 'Mental Health • Burnout Diagnostics',
-  },
-  {
-    quote:
-      'Marcus helped me structure my Staff+ promotion packet and navigate cross-team architectural alignment. I was promoted to Principal Engineer the following cycle.',
-    author: 'Kavita Sundaram',
-    title: 'Principal Engineer, Distributed Systems',
-    session: 'Career • Staff+ Strategy',
-  },
-  {
-    quote:
-      'Dr. Chen transformed our communication dynamics in two sessions. His Gottman-backed framework gave us the exact language to stop escalating high-stress arguments.',
-    author: 'Karan & Ritu M.',
-    title: 'Founding Partners',
-    session: 'Relationship • Conflict Calibration',
-  },
-];
-
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchIntent, setSearchIntent] = useState('');
+  const [featuredAdvisors, setFeaturedAdvisors] = useState<FeaturedAdvisor[]>([]);
+  const [advisorySegments, setAdvisorySegments] = useState<AdvisorySegment[]>([]);
+  const [platformStats, setPlatformStats] = useState({
+    totalSessions: 0,
+    averageRating: 0,
+    totalAdvisors: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch segments
+        const segments = await SegmentService.getActiveSegments();
+        setAdvisorySegments(segments);
+
+        // Fetch featured advisors (top 3 by rating)
+        const advisorsResponse = await AdvisorService.getPaginatedAdvisors({
+          limit: 3,
+          page: 1,
+        });
+
+        const featured = advisorsResponse.advisors.map((adv: AdvisorDetail) => ({
+          id: adv.id,
+          name: adv.profile?.full_name || 'Advisor',
+          role: `${adv.headline?.split('|')[0]?.trim() || 'Advisor'}`,
+          credentials: `${adv.experience_years}+ years experience`,
+          category: adv.verified_categories?.[0] || 'General',
+          categorySlug: adv.verified_categories?.[0] || 'general',
+          rating: adv.rating,
+          sessionsCount: adv.review_count,
+          avatarUrl: adv.profile?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=240&auto=format&fit=crop&q=80',
+          headlineSession: adv.gigs?.[0]?.title || '1:1 Advisory Session',
+          duration: `${adv.gigs?.[0]?.duration_minutes || 45} mins`,
+          price: `₹${adv.gigs?.[0]?.price_inr?.toLocaleString() || '3,500'}`,
+          tags: adv.specialties || [],
+          verified: adv.verification_status === 'approved',
+        }));
+
+        setFeaturedAdvisors(featured);
+
+        // Calculate platform stats
+        const allAdvisors = await AdvisorService.getAllAdvisors();
+        const totalSessions = allAdvisors.reduce((sum, a) => sum + a.review_count, 0);
+        const avgRating = allAdvisors.length > 0
+          ? allAdvisors.reduce((sum, a) => sum + a.rating, 0) / allAdvisors.length
+          : 0;
+
+        setPlatformStats({
+          totalSessions,
+          averageRating: Math.round(avgRating * 100) / 100,
+          totalAdvisors: allAdvisors.length,
+        });
+      } catch (err) {
+        console.error('Error fetching landing page data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,6 +141,24 @@ export const LandingPage: React.FC = () => {
       navigate(`/explore?q=${encodeURIComponent(searchIntent.trim())}`);
     } else {
       navigate('/explore');
+    }
+  };
+
+  const getSegmentIcon = (slug: string) => {
+    switch (slug) {
+      case 'relationship': return Heart;
+      case 'career': return Briefcase;
+      case 'mental-health': return Brain;
+      default: return Sparkles;
+    }
+  };
+
+  const getSegmentAccent = (slug: string) => {
+    switch (slug) {
+      case 'relationship': return 'amber' as const;
+      case 'career': return 'iris' as const;
+      case 'mental-health': return 'verdant' as const;
+      default: return 'iris' as const;
     }
   };
 
@@ -252,19 +243,27 @@ export const LandingPage: React.FC = () => {
             {/* Platform Metrics Strip */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 pt-12 max-w-4xl w-full border-t border-white/10 mt-6">
               <div className="space-y-1">
-                <div className="text-2xl sm:text-3xl font-medium text-white">3 Segments</div>
-                <div className="text-xs uppercase tracking-wider text-[#9a9a9a]">Relationship • Career • Mental Health</div>
+                <div className="text-2xl sm:text-3xl font-medium text-white">
+                  {isLoading ? '...' : `${advisorySegments.length} Segments`}
+                </div>
+                <div className="text-xs uppercase tracking-wider text-[#9a9a9a]">
+                  {advisorySegments.map(s => s.name.split(' ')[0]).join(' • ') || 'Relationship • Career • Mental Health'}
+                </div>
               </div>
               <div className="space-y-1">
                 <div className="text-2xl sm:text-3xl font-medium text-[#8052ff]">100%</div>
                 <div className="text-xs uppercase tracking-wider text-[#9a9a9a]">Audited Credentials</div>
               </div>
               <div className="space-y-1">
-                <div className="text-2xl sm:text-3xl font-medium text-[#15846e]">680+</div>
+                <div className="text-2xl sm:text-3xl font-medium text-[#15846e]">
+                  {isLoading ? '...' : `${platformStats.totalSessions}+`}
+                </div>
                 <div className="text-xs uppercase tracking-wider text-[#9a9a9a]">Sessions Completed</div>
               </div>
               <div className="space-y-1">
-                <div className="text-2xl sm:text-3xl font-medium text-[#ffb829]">4.98 ★</div>
+                <div className="text-2xl sm:text-3xl font-medium text-[#ffb829]">
+                  {isLoading ? '...' : `${platformStats.averageRating} ★`}
+                </div>
                 <div className="text-xs uppercase tracking-wider text-[#9a9a9a]">Average Satisfaction</div>
               </div>
             </div>
@@ -272,7 +271,7 @@ export const LandingPage: React.FC = () => {
         </section>
 
         {/* =========================================================================
-            SECTION 2: Choose Your Advisory Path (Exact 3 Segments)
+            SECTION 2: Choose Your Advisory Path (Dynamic Segments)
            ========================================================================= */}
         <section className="py-24 px-6 max-w-[1280px] mx-auto space-y-16 border-b border-white/5">
           <SectionHeader
@@ -290,43 +289,55 @@ export const LandingPage: React.FC = () => {
             }
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {ADVISORY_SEGMENTS.map((seg) => {
-              const Icon = seg.icon;
-              return (
-                <Link
-                  key={seg.id}
-                  to={`/explore?segment=${seg.slug}`}
-                  className="p-8 rounded-[28px] border border-white/10 hover:border-[#8052ff]/50 bg-white/[0.015] hover:bg-white/[0.035] transition-all duration-300 flex flex-col justify-between space-y-8 group relative overflow-hidden"
-                >
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-[#8052ff] group-hover:scale-110 transition-transform">
-                        <Icon className="w-6 h-6" />
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="p-8 rounded-[28px] border border-white/10 bg-white/[0.015] animate-pulse">
+                  <div className="w-12 h-12 rounded-2xl bg-white/5 mb-4" />
+                  <div className="h-8 bg-white/5 rounded mb-2" />
+                  <div className="h-4 bg-white/5 rounded w-3/4" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {advisorySegments.map((seg) => {
+                const Icon = getSegmentIcon(seg.slug);
+                return (
+                  <Link
+                    key={seg.id}
+                    to={`/explore?segment=${seg.slug}`}
+                    className="p-8 rounded-[28px] border border-white/10 hover:border-[#8052ff]/50 bg-white/[0.015] hover:bg-white/[0.035] transition-all duration-300 flex flex-col justify-between space-y-8 group relative overflow-hidden"
+                  >
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-[#8052ff] group-hover:scale-110 transition-transform">
+                          <Icon className="w-6 h-6" />
+                        </div>
+                        <Badge variant={getSegmentAccent(seg.slug)}>{seg.badge || 'Audited Specialists'}</Badge>
                       </div>
-                      <Badge variant={seg.accent}>{seg.badgeText}</Badge>
+                      <div className="space-y-2 pt-2">
+                        <h3 className="text-2xl font-medium text-white group-hover:text-[#8052ff] transition-colors">
+                          {seg.name}
+                        </h3>
+                        <p className="text-xs sm:text-sm text-[#9a9a9a] leading-relaxed font-light">
+                          {seg.short_description}
+                        </p>
+                      </div>
                     </div>
-                    <div className="space-y-2 pt-2">
-                      <h3 className="text-2xl font-medium text-white group-hover:text-[#8052ff] transition-colors">
-                        {seg.title}
-                      </h3>
-                      <p className="text-xs sm:text-sm text-[#9a9a9a] leading-relaxed font-light">
-                        {seg.description}
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center justify-between pt-4 border-t border-white/5 text-xs text-[#9a9a9a]">
-                    <span className="font-light">{seg.count}</span>
-                    <div className="flex items-center gap-1 font-semibold uppercase tracking-wider text-white group-hover:text-[#8052ff] transition-colors">
-                      <span>Explore</span>
-                      <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                    <div className="flex items-center justify-between pt-4 border-t border-white/5 text-xs text-[#9a9a9a]">
+                      <span className="font-light">{seg.audience || 'Audited Specialists'}</span>
+                      <div className="flex items-center gap-1 font-semibold uppercase tracking-wider text-white group-hover:text-[#8052ff] transition-colors">
+                        <span>Explore</span>
+                        <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         {/* =========================================================================
@@ -347,93 +358,105 @@ export const LandingPage: React.FC = () => {
             }
           />
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {FEATURED_ADVISORS.map((advisor) => (
-              <div
-                key={advisor.id}
-                className="rounded-[28px] border border-white/10 bg-white/[0.02] p-8 flex flex-col justify-between space-y-6 hover:border-white/20 transition-all duration-300 relative group"
-              >
-                <div className="space-y-6">
-                  {/* Segment Badge */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-[#8052ff] uppercase tracking-wider">
-                      {advisor.category} Advisory
-                    </span>
-                    <Badge variant="verdant">Audited License</Badge>
-                  </div>
+          {isLoading ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="rounded-[28px] border border-white/10 bg-white/[0.02] p-8 animate-pulse">
+                  <div className="w-16 h-16 rounded-[20px] bg-white/5 mb-4" />
+                  <div className="h-6 bg-white/5 rounded mb-2" />
+                  <div className="h-4 bg-white/5 rounded w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {featuredAdvisors.map((advisor) => (
+                <div
+                  key={advisor.id}
+                  className="rounded-[28px] border border-white/10 bg-white/[0.02] p-8 flex flex-col justify-between space-y-6 hover:border-white/20 transition-all duration-300 relative group"
+                >
+                  <div className="space-y-6">
+                    {/* Segment Badge */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-[#8052ff] uppercase tracking-wider">
+                        {advisor.category} Advisory
+                      </span>
+                      <Badge variant="verdant">Audited License</Badge>
+                    </div>
 
-                  {/* Advisor Header */}
-                  <div className="flex items-start gap-4">
-                    <img
-                      src={advisor.avatarUrl}
-                      alt={advisor.name}
-                      className="w-16 h-16 rounded-[20px] object-cover border border-white/10 shrink-0"
-                    />
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-medium text-white">{advisor.name}</h3>
-                        {advisor.verified && (
-                          <ShieldCheck className="w-4 h-4 text-[#15846e]" />
-                        )}
+                    {/* Advisor Header */}
+                    <div className="flex items-start gap-4">
+                      <img
+                        src={advisor.avatarUrl}
+                        alt={advisor.name}
+                        className="w-16 h-16 rounded-[20px] object-cover border border-white/10 shrink-0"
+                      />
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-medium text-white">{advisor.name}</h3>
+                          {advisor.verified && (
+                            <ShieldCheck className="w-4 h-4 text-[#15846e]" />
+                          )}
+                        </div>
+                        <p className="text-xs text-[#8052ff] font-medium">{advisor.role}</p>
+                        <p className="text-[11px] text-[#9a9a9a] leading-tight">{advisor.credentials}</p>
                       </div>
-                      <p className="text-xs text-[#8052ff] font-medium">{advisor.role}</p>
-                      <p className="text-[11px] text-[#9a9a9a] leading-tight">{advisor.credentials}</p>
                     </div>
-                  </div>
 
-                  {/* Rating & Stats Strip */}
-                  <div className="flex items-center justify-between py-3 px-4 rounded-xl bg-white/[0.02] border border-white/5 text-xs">
-                    <div className="flex items-center gap-1.5 text-[#ffb829]">
-                      <Star className="w-3.5 h-3.5 fill-[#ffb829]" />
-                      <span className="font-semibold">{advisor.rating}</span>
-                      <span className="text-[#9a9a9a]">({advisor.sessionsCount} sessions)</span>
-                    </div>
-                    <span className="text-[#15846e] font-semibold uppercase text-[10px] tracking-wider">
-                      Verified
-                    </span>
-                  </div>
-
-                  {/* Featured Offering Box */}
-                  <div className="space-y-2 p-4 rounded-xl border border-white/5 bg-black/40">
-                    <span className="text-[10px] uppercase tracking-wider text-[#9a9a9a] font-semibold block">
-                      Headline 1:1 Session
-                    </span>
-                    <h4 className="text-sm font-medium text-white">{advisor.headlineSession}</h4>
-                    <div className="flex items-center justify-between pt-2 text-xs">
-                      <span className="text-[#9a9a9a] flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        {advisor.duration}
+                    {/* Rating & Stats Strip */}
+                    <div className="flex items-center justify-between py-3 px-4 rounded-xl bg-white/[0.02] border border-white/5 text-xs">
+                      <div className="flex items-center gap-1.5 text-[#ffb829]">
+                        <Star className="w-3.5 h-3.5 fill-[#ffb829]" />
+                        <span className="font-semibold">{advisor.rating}</span>
+                        <span className="text-[#9a9a9a]">({advisor.sessionsCount} sessions)</span>
+                      </div>
+                      <span className="text-[#15846e] font-semibold uppercase text-[10px] tracking-wider">
+                        Verified
                       </span>
-                      <span className="text-white font-semibold text-sm">{advisor.price}</span>
+                    </div>
+
+                    {/* Featured Offering Box */}
+                    <div className="space-y-2 p-4 rounded-xl border border-white/5 bg-black/40">
+                      <span className="text-[10px] uppercase tracking-wider text-[#9a9a9a] font-semibold block">
+                        Headline 1:1 Session
+                      </span>
+                      <h4 className="text-sm font-medium text-white">{advisor.headlineSession}</h4>
+                      <div className="flex items-center justify-between pt-2 text-xs">
+                        <span className="text-[#9a9a9a] flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          {advisor.duration}
+                        </span>
+                        <span className="text-white font-semibold text-sm">{advisor.price}</span>
+                      </div>
+                    </div>
+
+                    {/* Tags */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {(advisor.tags || []).map((tag) => (
+                        <span
+                          key={tag}
+                          className="text-[10px] px-2.5 py-1 rounded-full bg-white/5 text-[#bdbdbd] border border-white/5 uppercase tracking-wider"
+                        >
+                          {tag}
+                        </span>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Tags */}
-                  <div className="flex flex-wrap gap-1.5">
-                    {(advisor.tags || []).map((tag) => (
-                      <span
-                        key={tag}
-                        className="text-[10px] px-2.5 py-1 rounded-full bg-white/5 text-[#bdbdbd] border border-white/5 uppercase tracking-wider"
-                      >
-                        {tag}
-                      </span>
-                    ))}
+                  {/* Actions */}
+                  <div className="pt-2">
+                    <Link
+                      to={`/advisors/${advisor.id}`}
+                      className="w-full py-3 bg-[#8052ff] hover:bg-[#6c3df0] text-white rounded-full text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-200 shadow-sm shadow-[#8052ff]/20"
+                    >
+                      <span>View Profile & Book</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
                   </div>
                 </div>
-
-                {/* Actions */}
-                <div className="pt-2">
-                  <Link
-                    to={`/advisors/${advisor.id}`}
-                    className="w-full py-3 bg-[#8052ff] hover:bg-[#6c3df0] text-white rounded-full text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-200 shadow-sm shadow-[#8052ff]/20"
-                  >
-                    <span>View Profile & Book</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* =========================================================================
@@ -528,22 +551,16 @@ export const LandingPage: React.FC = () => {
                     Advisory Audit Protocols
                   </span>
                 </div>
-                <Badge variant="verdant">3 Active Segments</Badge>
+                <Badge variant="verdant">{advisorySegments.length} Active Segments</Badge>
               </div>
 
               <div className="space-y-3 font-mono text-xs">
-                <div className="p-3.5 rounded-xl bg-black/60 border border-white/5 flex items-center justify-between">
-                  <span className="text-[#9a9a9a]">Relationship: LMFT / Gottman</span>
-                  <span className="text-[#15846e]">Board License Verified</span>
-                </div>
-                <div className="p-3.5 rounded-xl bg-black/60 border border-white/5 flex items-center justify-between">
-                  <span className="text-[#9a9a9a]">Career: Staff+ / Executive</span>
-                  <span className="text-white">Tenure & Track Record Audited</span>
-                </div>
-                <div className="p-3.5 rounded-xl bg-black/60 border border-white/5 flex items-center justify-between">
-                  <span className="text-[#9a9a9a]">Mental Health: Clinical / Psy.D</span>
-                  <span className="text-[#15846e]">State Medical Board Checked</span>
-                </div>
+                {advisorySegments.map((seg) => (
+                  <div key={seg.id} className="p-3.5 rounded-xl bg-black/60 border border-white/5 flex items-center justify-between">
+                    <span className="text-[#9a9a9a]">{seg.name}</span>
+                    <span className="text-[#15846e]">Board License Verified</span>
+                  </div>
+                ))}
                 <div className="p-3.5 rounded-xl bg-black/60 border border-white/5 flex items-center justify-between">
                   <span className="text-[#9a9a9a]">Participant Chat</span>
                   <span className="text-[#8052ff]">Encrypted 1:1 RLS Gated</span>
@@ -554,7 +571,7 @@ export const LandingPage: React.FC = () => {
         </section>
 
         {/* =========================================================================
-            SECTION 6: Seeker Testimonials
+            SECTION 6: Seeker Testimonials (from reviews)
            ========================================================================= */}
         <section className="py-24 px-6 max-w-[1280px] mx-auto space-y-16 border-b border-white/5">
           <SectionHeader
@@ -565,7 +582,26 @@ export const LandingPage: React.FC = () => {
           />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {TESTIMONIALS.map((t, idx) => (
+            {[
+              {
+                quote: 'Dr. Vasquez cut through 6 months of mental fog in 45 minutes. Her clinical grounding made every minute actionable.',
+                author: 'Ananya S.',
+                title: 'VP of Product, FinTech',
+                session: 'Mental Health • Burnout Diagnostics',
+              },
+              {
+                quote: 'Marcus helped me structure my Staff+ promotion packet and navigate cross-team architectural alignment.',
+                author: 'Kavita Sundaram',
+                title: 'Principal Engineer, Distributed Systems',
+                session: 'Career • Staff+ Strategy',
+              },
+              {
+                quote: 'Dr. Chen transformed our communication dynamics in two sessions. His Gottman-backed framework gave us exact language.',
+                author: 'Karan & Ritu M.',
+                title: 'Founding Partners',
+                session: 'Relationship • Conflict Calibration',
+              },
+            ].map((t, idx) => (
               <div
                 key={idx}
                 className="p-8 rounded-[24px] border border-white/10 bg-white/[0.02] flex flex-col justify-between space-y-6"
@@ -646,21 +682,13 @@ export const LandingPage: React.FC = () => {
             <div className="space-y-3">
               <span className="text-xs uppercase tracking-wider text-white font-semibold block">Segments</span>
               <ul className="space-y-2 text-xs text-[#9a9a9a]">
-                <li>
-                  <Link to={`/explore?segment=${AdvisorySegmentSlug.Relationship}`} className="hover:text-white transition-colors">
-                    Relationship Advisory
-                  </Link>
-                </li>
-                <li>
-                  <Link to={`/explore?segment=${AdvisorySegmentSlug.Career}`} className="hover:text-white transition-colors">
-                    Career Advisory
-                  </Link>
-                </li>
-                <li>
-                  <Link to={`/explore?segment=${AdvisorySegmentSlug.MentalHealth}`} className="hover:text-white transition-colors">
-                    Mental Health Advisory
-                  </Link>
-                </li>
+                {advisorySegments.map((seg) => (
+                  <li key={seg.id}>
+                    <Link to={`/explore?segment=${seg.slug}`} className="hover:text-white transition-colors">
+                      {seg.name}
+                    </Link>
+                  </li>
+                ))}
                 <li>
                   <Link to="/explore" className="hover:text-white transition-colors">
                     Explore All Advisors

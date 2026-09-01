@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../domains/auth/AuthContext';
 import { useToast } from '../../components/ui/Toast';
-import { AdvisorDetail } from '../../domains/advisor/seedData';
+import { AdvisorDetail } from '../../domains/advisor/AdvisorService';
 import { Gig } from '../../lib/supabase/types';
 import { AvailabilityService, TimeSlot } from '../../domains/booking/AvailabilityService';
 import { BookingService, EnrichedBooking } from '../../domains/booking/BookingService';

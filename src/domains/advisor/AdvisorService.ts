@@ -1,9 +1,25 @@
 import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
-import { Category, Gig } from '../../lib/supabase/types';
-import { SEED_ADVISORS, AdvisorDetail } from './seedData';
+import { Category, Gig, Mentor, Profile } from '../../lib/supabase/types';
 import { AdvisorFilter, PaginatedAdvisorFilter, PaginatedAdvisorResponse } from './advisor.types';
 import { SegmentService } from '../segment/SegmentService';
 import { AdvisorySegment } from '../segment/SegmentTypes';
+
+export interface AdvisorDetail extends Mentor {
+  profile?: Profile;
+  gigs?: Gig[];
+  reviews?: any[];
+  segment_id?: string;
+  segment_name?: string;
+  role_title?: string;
+  specialties?: string[];
+  credentials_detail?: {
+    license_number?: string;
+    issuing_authority?: string;
+    verified_date?: string;
+    degree?: string;
+    institution?: string;
+  };
+}
 
 export class AdvisorService {
   /**
@@ -56,7 +72,15 @@ export class AdvisorService {
     const targetSegment = filters.segment || filters.categoryId;
 
     if (!isSupabaseConfigured) {
-      return this.paginateSeedAdvisors(filters, page, limit, offset, targetSegment);
+      console.warn('Supabase not configured. Returning empty advisors.');
+      return {
+        advisors: [],
+        hasMore: false,
+        page,
+        limit,
+        totalCount: 0,
+        nextCursor: null,
+      };
     }
 
     try {
@@ -89,7 +113,14 @@ export class AdvisorService {
       const { data, count, error } = await query;
 
       if (error || !data || data.length === 0) {
-        return this.paginateSeedAdvisors(filters, page, limit, offset, targetSegment);
+        return {
+          advisors: [],
+          hasMore: false,
+          page,
+          limit,
+          totalCount: count || 0,
+          nextCursor: null,
+        };
       }
 
       const totalCount = count || data.length;
@@ -117,84 +148,17 @@ export class AdvisorService {
         totalCount,
         nextCursor,
       };
-    } catch {
-      return this.paginateSeedAdvisors(filters, page, limit, offset, targetSegment);
+    } catch (err) {
+      console.error('Error fetching paginated advisors:', err);
+      return {
+        advisors: [],
+        hasMore: false,
+        page,
+        limit,
+        totalCount: 0,
+        nextCursor: null,
+      };
     }
-  }
-
-  private static paginateSeedAdvisors(
-    filters: PaginatedAdvisorFilter,
-    page: number,
-    limit: number,
-    offset: number,
-    targetSegment?: string
-  ): PaginatedAdvisorResponse {
-    let filtered = [...SEED_ADVISORS];
-
-    if (targetSegment && targetSegment !== 'all') {
-      const canonicalSeg = SegmentService.getCachedSegmentBySlug(targetSegment);
-      const resolvedSlug = canonicalSeg ? canonicalSeg.slug : targetSegment.toLowerCase().trim();
-      const resolvedId = canonicalSeg ? canonicalSeg.id : targetSegment;
-
-      filtered = filtered.filter(
-        (adv) =>
-          adv.segment_id === resolvedSlug ||
-          adv.segment_id === resolvedId ||
-          adv.primary_segment_id === resolvedId ||
-          adv.verified_categories?.includes(resolvedSlug) ||
-          adv.gigs?.some((g) => g.segment_id === resolvedSlug || g.segment_id === resolvedId)
-      );
-    }
-
-    if (filters.searchQuery) {
-      const q = (filters.searchQuery || '').toLowerCase().trim();
-      filtered = filtered.filter(
-        (adv) =>
-          (adv.profile?.full_name || '').toLowerCase().includes(q) ||
-          (adv.headline || '').toLowerCase().includes(q) ||
-          (adv.bio || '').toLowerCase().includes(q) ||
-          (adv.segment_name || '').toLowerCase().includes(q) ||
-          (adv.role_title || '').toLowerCase().includes(q) ||
-          (adv.specialties || []).some((s) => s.toLowerCase().includes(q)) ||
-          (adv.gigs || []).some(
-            (g) =>
-              (g.title || '').toLowerCase().includes(q) ||
-              (g.description || '').toLowerCase().includes(q) ||
-              (g.deliverables || []).some((d) => d.toLowerCase().includes(q))
-          )
-      );
-    }
-
-    if (filters.minRating) {
-      filtered = filtered.filter((adv) => (adv.rating || 5) >= filters.minRating!);
-    }
-
-    if (filters.maxPrice) {
-      filtered = filtered.filter((adv) =>
-        (adv.gigs || []).some((g) => g.price_inr <= filters.maxPrice!)
-      );
-    }
-
-    if (filters.verifiedOnly) {
-      filtered = filtered.filter((adv) => adv.verification_status === 'approved');
-    }
-
-    const totalCount = filtered.length;
-    const paginatedItems = filtered.slice(offset, offset + limit);
-    const hasMore = offset + paginatedItems.length < totalCount;
-    const nextCursor =
-      hasMore && paginatedItems.length > 0
-        ? paginatedItems[paginatedItems.length - 1].id
-        : null;
-
-    return {
-      advisors: paginatedItems,
-      hasMore,
-      page,
-      limit,
-      totalCount,
-      nextCursor,
-    };
   }
 
   /**
@@ -204,48 +168,8 @@ export class AdvisorService {
     const targetSegment = filters?.segment || filters?.categoryId;
 
     if (!isSupabaseConfigured) {
-      let results = [...SEED_ADVISORS];
-
-      if (targetSegment && targetSegment !== 'all') {
-        const canonicalSeg = SegmentService.getCachedSegmentBySlug(targetSegment);
-        const resolvedSlug = canonicalSeg ? canonicalSeg.slug : targetSegment.toLowerCase().trim();
-        const resolvedId = canonicalSeg ? canonicalSeg.id : targetSegment;
-
-        results = results.filter(
-          (adv) =>
-            adv.segment_id === resolvedSlug ||
-            adv.segment_id === resolvedId ||
-            adv.verified_categories?.includes(resolvedSlug) ||
-            adv.gigs?.some((g) => g.segment_id === resolvedSlug || g.segment_id === resolvedId)
-        );
-      }
-
-      if (filters?.searchQuery) {
-        const q = (filters.searchQuery || '').toLowerCase().trim();
-        results = results.filter(
-          (adv) =>
-            (adv.profile?.full_name || '').toLowerCase().includes(q) ||
-            (adv.headline || '').toLowerCase().includes(q) ||
-            (adv.bio || '').toLowerCase().includes(q) ||
-            (adv.specialties || []).some((s) => s.toLowerCase().includes(q))
-        );
-      }
-
-      if (filters?.minRating) {
-        results = results.filter((adv) => (adv.rating || 5) >= filters.minRating!);
-      }
-
-      if (filters?.maxPrice) {
-        results = results.filter((adv) =>
-          (adv.gigs || []).some((g) => g.price_inr <= filters.maxPrice!)
-        );
-      }
-
-      if (filters?.verifiedOnly) {
-        results = results.filter((adv) => adv.verification_status === 'approved');
-      }
-
-      return results;
+      console.warn('Supabase not configured. Returning empty advisors.');
+      return [];
     }
 
     try {
@@ -254,27 +178,27 @@ export class AdvisorService {
         .select('*, profile:profiles(*), gigs(*)')
         .eq('verification_status', 'approved');
 
-      const { data, error } = await query;
-
-      if (error || !data || data.length === 0) {
-        return this.filterSeedAdvisors(filters);
-      }
-
-      let results = data as AdvisorDetail[];
-
       if (targetSegment && targetSegment !== 'all') {
         const canonicalSeg = await SegmentService.getSegmentBySlug(targetSegment);
         const resolvedSlug = canonicalSeg ? canonicalSeg.slug : targetSegment;
         const resolvedId = canonicalSeg ? canonicalSeg.id : targetSegment;
 
-        results = results.filter(
-          (adv) =>
-            adv.segment_id === resolvedId ||
-            adv.segment_id === resolvedSlug ||
-            adv.verified_categories?.includes(resolvedSlug) ||
-            adv.gigs?.some((g) => g.segment_id === resolvedSlug || g.segment_id === resolvedId)
-        );
+        query = query.or(`segment_id.eq.${resolvedId},verified_categories.cs.{${resolvedSlug}}`);
       }
+
+      if (filters?.minRating) {
+        query = query.gte('rating', filters.minRating);
+      }
+
+      query = query.order('rating', { ascending: false });
+
+      const { data, error } = await query;
+
+      if (error || !data || data.length === 0) {
+        return [];
+      }
+
+      let results = data as AdvisorDetail[];
 
       if (filters?.searchQuery) {
         const q = (filters.searchQuery || '').toLowerCase().trim();
@@ -282,45 +206,22 @@ export class AdvisorService {
           (adv) =>
             (adv.profile?.full_name || '').toLowerCase().includes(q) ||
             (adv.headline || '').toLowerCase().includes(q) ||
-            (adv.bio || '').toLowerCase().includes(q)
+            (adv.bio || '').toLowerCase().includes(q) ||
+            (adv.specialties || []).some((s: string) => s.toLowerCase().includes(q))
+        );
+      }
+
+      if (filters?.maxPrice) {
+        results = results.filter((adv) =>
+          (adv.gigs || []).some((g) => g.price_inr <= filters.maxPrice!)
         );
       }
 
       return results;
-    } catch {
-      return this.filterSeedAdvisors(filters);
+    } catch (err) {
+      console.error('Error fetching advisors:', err);
+      return [];
     }
-  }
-
-  private static filterSeedAdvisors(filters?: AdvisorFilter): AdvisorDetail[] {
-    let results = [...SEED_ADVISORS];
-    const targetSegment = filters?.segment || filters?.categoryId;
-
-    if (targetSegment && targetSegment !== 'all') {
-      const canonicalSeg = SegmentService.getCachedSegmentBySlug(targetSegment);
-      const resolvedSlug = canonicalSeg ? canonicalSeg.slug : targetSegment.toLowerCase().trim();
-      const resolvedId = canonicalSeg ? canonicalSeg.id : targetSegment;
-
-      results = results.filter(
-        (adv) =>
-          adv.segment_id === resolvedSlug ||
-          adv.segment_id === resolvedId ||
-          adv.verified_categories.includes(resolvedSlug) ||
-          adv.gigs.some((g) => g.segment_id === resolvedSlug || g.segment_id === resolvedId)
-      );
-    }
-
-    if (filters?.searchQuery) {
-      const q = (filters.searchQuery || '').toLowerCase().trim();
-      results = results.filter(
-        (adv) =>
-          (adv.profile?.full_name || '').toLowerCase().includes(q) ||
-          (adv.headline || '').toLowerCase().includes(q) ||
-          (adv.bio || '').toLowerCase().includes(q)
-      );
-    }
-
-    return results;
   }
 
   /**
@@ -328,10 +229,8 @@ export class AdvisorService {
    */
   static async getAdvisorById(id: string): Promise<AdvisorDetail | null> {
     if (!isSupabaseConfigured) {
-      const found = SEED_ADVISORS.find(
-        (adv) => adv.id === id || adv.profile.id === id
-      );
-      return found || null;
+      console.warn('Supabase not configured. Cannot fetch advisor.');
+      return null;
     }
 
     try {
@@ -342,18 +241,14 @@ export class AdvisorService {
         .single();
 
       if (error || !data) {
-        const found = SEED_ADVISORS.find(
-          (adv) => adv.id === id || adv.profile.id === id
-        );
-        return found || null;
+        console.error('Error fetching advisor:', error);
+        return null;
       }
 
       return data as AdvisorDetail;
-    } catch {
-      const found = SEED_ADVISORS.find(
-        (adv) => adv.id === id || adv.profile.id === id
-      );
-      return found || null;
+    } catch (err) {
+      console.error('Error in getAdvisorById:', err);
+      return null;
     }
   }
 
@@ -361,39 +256,29 @@ export class AdvisorService {
    * Admin / Mentor: Update mentor's assigned advisory segment
    */
   static async updateAdvisorSegment(mentorId: string, segmentIdOrSlug: string): Promise<boolean> {
-    const segment = await SegmentService.getSegmentBySlug(segmentIdOrSlug);
-    const resolvedId = segment ? segment.id : segmentIdOrSlug;
-    const resolvedSlug = segment ? segment.slug : segmentIdOrSlug;
-
-    // Update in-memory seed advisors for instant UI reactivity
-    const idx = SEED_ADVISORS.findIndex((a) => a.id === mentorId || a.profile.id === mentorId);
-    if (idx !== -1) {
-      SEED_ADVISORS[idx].segment_id = resolvedId;
-      SEED_ADVISORS[idx].primary_segment_id = resolvedId;
-      if (segment) {
-        SEED_ADVISORS[idx].segment_name = segment.name;
-        SEED_ADVISORS[idx].role_title = `${segment.name} Advisor`;
-      }
-      if (!SEED_ADVISORS[idx].verified_categories.includes(resolvedSlug)) {
-        SEED_ADVISORS[idx].verified_categories.push(resolvedSlug);
-      }
+    if (!isSupabaseConfigured) {
+      return false;
     }
 
-    if (isSupabaseConfigured) {
-      try {
-        await supabase
-          .from('mentors')
-          .update({
-            segment_id: resolvedId,
-            verified_categories: [resolvedSlug],
-          })
-          .eq('id', mentorId);
-      } catch (err) {
-        console.warn('Failed to update advisor segment in DB', err);
-      }
-    }
+    try {
+      const segment = await SegmentService.getSegmentBySlug(segmentIdOrSlug);
+      const resolvedId = segment ? segment.id : segmentIdOrSlug;
+      const resolvedSlug = segment ? segment.slug : segmentIdOrSlug;
 
-    return true;
+      const { error } = await supabase
+        .from('mentors')
+        .update({
+          segment_id: resolvedId,
+          primary_segment_id: resolvedId,
+          verified_categories: [resolvedSlug],
+        })
+        .eq('id', mentorId);
+
+      return !error;
+    } catch (err) {
+      console.error('Error updating advisor segment:', err);
+      return false;
+    }
   }
 
   /**
@@ -403,18 +288,87 @@ export class AdvisorService {
   static async getGigById(
     gigId: string
   ): Promise<{ gig: Gig; advisor: AdvisorDetail; segment: AdvisorySegment | null } | null> {
-    const allAdvisors = SEED_ADVISORS;
-    const advisor = allAdvisors.find((adv) =>
-      (adv.gigs || []).some((g) => g.id === gigId || g.slug === gigId)
-    );
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Cannot fetch gig.');
+      return null;
+    }
 
-    if (!advisor) return null;
+    try {
+      const { data: gigData, error: gigError } = await supabase
+        .from('gigs')
+        .select(`
+          *,
+          mentor:mentors(*, profile:profiles(*))
+        `)
+        .eq('id', gigId)
+        .single();
 
-    const gig = advisor.gigs?.find((g) => g.id === gigId || g.slug === gigId) || null;
-    if (!gig) return null;
+      if (gigError || !gigData) {
+        console.error('Error fetching gig:', gigError);
+        return null;
+      }
 
-    const segment = SegmentService.getCachedSegmentBySlug(gig.segment_id || advisor.segment_id || advisor.id) || null;
+      const segment = gigData.segment_id
+        ? await SegmentService.getSegmentBySlug(gigData.segment_id)
+        : null;
 
-    return { gig, advisor, segment };
+      return {
+        gig: gigData,
+        advisor: gigData.mentor,
+        segment,
+      };
+    } catch (err) {
+      console.error('Error in getGigById:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Get advisor statistics (total count, by segment, etc.)
+   */
+  static async getAdvisorStats(): Promise<{
+    totalAdvisors: number;
+    approvedAdvisors: number;
+    pendingAdvisors: number;
+    bySegment: { [key: string]: number };
+  }> {
+    if (!isSupabaseConfigured) {
+      return {
+        totalAdvisors: 0,
+        approvedAdvisors: 0,
+        pendingAdvisors: 0,
+        bySegment: {},
+      };
+    }
+
+    try {
+      const [{ count: totalCount }, { count: approvedCount }, { count: pendingCount }, { data: mentors }] = await Promise.all([
+        supabase.from('mentors').select('*', { count: 'exact', head: true }),
+        supabase.from('mentors').select('*', { count: 'exact', head: true }).eq('verification_status', 'approved'),
+        supabase.from('mentors').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
+        supabase.from('mentors').select('segment_id, verified_categories'),
+      ]);
+
+      const bySegment: { [key: string]: number } = {};
+      mentors?.forEach((m: any) => {
+        const segId = m.segment_id || m.verified_categories?.[0] || 'unknown';
+        bySegment[segId] = (bySegment[segId] || 0) + 1;
+      });
+
+      return {
+        totalAdvisors: totalCount || 0,
+        approvedAdvisors: approvedCount || 0,
+        pendingAdvisors: pendingCount || 0,
+        bySegment,
+      };
+    } catch (err) {
+      console.error('Error fetching advisor stats:', err);
+      return {
+        totalAdvisors: 0,
+        approvedAdvisors: 0,
+        pendingAdvisors: 0,
+        bySegment: {},
+      };
+    }
   }
 }

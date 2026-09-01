@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { AdvisorDetail } from '../../domains/advisor/seedData';
+import { AdvisorDetail } from '../../domains/advisor/AdvisorService';
 import { ShieldCheck, Star, Clock, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { SegmentService } from '../../domains/segment/SegmentService';

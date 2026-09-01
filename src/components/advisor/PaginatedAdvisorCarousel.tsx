@@ -23,7 +23,7 @@ import {
   Clock,
   CheckCircle2,
 } from 'lucide-react';
-import { AdvisorDetail } from '../../domains/advisor/seedData';
+import { AdvisorDetail } from '../../domains/advisor/AdvisorService';
 import { AdvisorService } from '../../domains/advisor/AdvisorService';
 import { AdvisorySegment } from '../../domains/segment/SegmentTypes';
 import { SegmentService } from '../../domains/segment/SegmentService';

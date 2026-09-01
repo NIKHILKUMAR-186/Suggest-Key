@@ -1,7 +1,6 @@
+import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
 import { Gig } from '../../lib/supabase/types';
 import { SegmentService } from '../segment/SegmentService';
-import { INITIAL_SEED_SEGMENTS } from '../segment/SegmentTypes';
-import { SEED_ADVISORS } from '../advisor/seedData';
 
 export interface AvailabilitySlotRule {
   dayOfWeek: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
@@ -29,9 +28,7 @@ export interface MentorEarningsStats {
   }[];
 }
 
-const STORAGE_KEY_GIGS = 'suggestkey_mentor_gigs';
-const STORAGE_KEY_AVAILABILITY = 'suggestkey_mentor_availability';
-
+// Default availability template (UI configuration, not business data)
 const DEFAULT_AVAILABILITY: AvailabilitySlotRule[] = [
   { dayOfWeek: 'Monday', enabled: true, startTime: '09:00', endTime: '18:00', slotDurationMinutes: 45, bufferMinutes: 15 },
   { dayOfWeek: 'Tuesday', enabled: true, startTime: '09:00', endTime: '18:00', slotDurationMinutes: 45, bufferMinutes: 15 },
@@ -43,62 +40,92 @@ const DEFAULT_AVAILABILITY: AvailabilitySlotRule[] = [
 ];
 
 export class MentorStudioService {
-  private static getGigsStorageKey(mentorId: string): string {
-    return `${STORAGE_KEY_GIGS}_${mentorId}`;
-  }
-
-  private static getStoredGigs(mentorId: string = 'evelyn-vasquez'): Gig[] {
-    const key = this.getGigsStorageKey(mentorId);
-    try {
-      const data = localStorage.getItem(key);
-      if (data) return JSON.parse(data);
-    } catch (e) {
-      console.warn('LocalStorage error reading mentor gigs', e);
-    }
-    const mentorSeed = SEED_ADVISORS.find((a) => a.id === mentorId);
-    const defaultGigs = (mentorSeed?.gigs || SEED_ADVISORS[0].gigs).map((g) => ({
-      ...g,
-      segment_id: g.segment_id || g.category_id || g.id,
-    }));
-    localStorage.setItem(key, JSON.stringify(defaultGigs));
-    return defaultGigs;
-  }
-
-  private static saveGigs(mentorId: string, gigs: Gig[]) {
-    const key = this.getGigsStorageKey(mentorId);
-    try {
-      localStorage.setItem(key, JSON.stringify(gigs));
-    } catch (e) {
-      console.warn('LocalStorage error saving mentor gigs', e);
-    }
-  }
-
   /**
-   * Get all gigs for active mentor
+   * Get all gigs for a mentor from Supabase
    */
-  static async getMentorGigs(mentorId: string = 'evelyn-vasquez'): Promise<Gig[]> {
-    return this.getStoredGigs(mentorId);
+  static async getMentorGigs(mentorId: string): Promise<Gig[]> {
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Returning empty gigs.');
+      return [];
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('gigs')
+        .select('*')
+        .eq('mentor_id', mentorId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching mentor gigs:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('Error in getMentorGigs:', err);
+      return [];
+    }
   }
 
-  static async getGigById(gigId: string, mentorId: string = 'evelyn-vasquez'): Promise<Gig | null> {
-    const gigs = this.getStoredGigs(mentorId);
-    return gigs.find((g) => g.id === gigId || g.slug === gigId) || null;
+  static async getGigById(gigId: string, mentorId?: string): Promise<Gig | null> {
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Cannot fetch gig.');
+      return null;
+    }
+
+    try {
+      let query = supabase
+        .from('gigs')
+        .select('*')
+        .or(`id.eq.${gigId},slug.eq.${gigId}`);
+
+      if (mentorId) {
+        query = query.eq('mentor_id', mentorId);
+      }
+
+      const { data, error } = await query.single();
+
+      if (error || !data) {
+        console.error('Error fetching gig:', error);
+        return null;
+      }
+
+      return data;
+    } catch (err) {
+      console.error('Error in getGigById:', err);
+      return null;
+    }
   }
 
   static async saveGig(
-    gigData: Partial<Gig> & { id?: string; segment_id?: string },
-    mentorId: string = 'evelyn-vasquez'
+    gigData: Partial<Gig> & { id?: string; segment_id: string },
+    mentorId: string
   ): Promise<Gig> {
-    const gigs = this.getStoredGigs(mentorId);
-    const activeSegments = await SegmentService.getActiveSegments();
-    const activeSegmentIds = new Set(activeSegments.map((s) => s.id));
-    const activeSegmentSlugs = new Set(activeSegments.map((s) => s.slug));
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase not configured. Cannot save gig.');
+    }
 
-    const segmentId = gigData.segment_id;
-    const segmentActive =
-      segmentId && (activeSegmentIds.has(segmentId) || activeSegmentSlugs.has(segmentId));
+    if (!mentorId) {
+      throw new Error('Mentor ID is required to save a gig.');
+    }
 
-    if (segmentId && !segmentActive) {
+    if (!gigData.title || !gigData.title.trim()) {
+      throw new Error('Gig title is required.');
+    }
+
+    if (!gigData.segment_id) {
+      throw new Error('A valid active segment is required to create a gig.');
+    }
+
+    // Validate segment is active
+    const segment = await SegmentService.getSegmentBySlug(gigData.segment_id);
+    if (!segment) {
+      const err = new Error('Selected segment does not exist.');
+      (err as any).code = 'SEGMENT_NOT_FOUND';
+      throw err;
+    }
+    if (!segment.is_active) {
       const err = new Error(
         'Cannot save gig: selected segment is not active. Mentors can only create gigs under active admin-managed segments.'
       );
@@ -106,77 +133,100 @@ export class MentorStudioService {
       throw err;
     }
 
-    const isEdit = Boolean(gigData.id && gigs.some((g) => g.id === gigData.id));
-    const fallbackSegmentId =
-      activeSegments[0]?.id || INITIAL_SEED_SEGMENTS[0]?.id || activeSegments[0]?.slug || INITIAL_SEED_SEGMENTS[0]?.slug;
+    const isEdit = Boolean(gigData.id);
 
     if (isEdit) {
-      const index = gigs.findIndex((g) => g.id === gigData.id);
-      if (index === -1) {
-        const err = new Error('Cannot update gig: you do not have permission to modify this gig.');
-        (err as any).code = 'PERMISSION_DENIED';
-        throw err;
+      // Update existing gig — ownership enforced by .eq('mentor_id', mentorId)
+      const { data, error } = await supabase
+        .from('gigs')
+        .update({
+          title: gigData.title.trim(),
+          description: gigData.description?.trim() || '',
+          duration_minutes: gigData.duration_minutes,
+          price_inr: gigData.price_inr,
+          deliverables: gigData.deliverables,
+          is_published: gigData.is_published,
+          segment_id: gigData.segment_id,
+        })
+        .eq('id', gigData.id)
+        .eq('mentor_id', mentorId)
+        .select()
+        .single();
+
+      if (error || !data) {
+        throw new Error(error?.message || 'Cannot update gig: you do not have permission to modify this gig.');
       }
-      const updated: Gig = {
-        ...gigs[index],
-        ...gigData,
-        segment_id: gigData.segment_id || gigs[index].segment_id,
-        mentor_id: mentorId,
-      } as Gig;
-      gigs[index] = updated;
-      this.saveGigs(mentorId, gigs);
-      return updated;
+
+      return data;
     } else {
-      const newGig: Gig = {
-        id: gigData.id || `gig-${Date.now().toString().slice(-6)}`,
-        mentor_id: mentorId,
-        segment_id: gigData.segment_id || fallbackSegmentId,
-        title: gigData.title || 'Untitled Advisory Session',
-        slug: (gigData.title || 'untitled-session').toLowerCase().replace(/\s+/g, '-'),
-        description: gigData.description || 'Comprehensive 1:1 advisory consultation.',
-        duration_minutes: gigData.duration_minutes || 45,
-        price_inr: gigData.price_inr || 3500,
-        deliverables: gigData.deliverables || ['45-minute 1:1 consultation', 'Written post-call summary'],
-        is_published: gigData.is_published ?? true,
-        created_at: new Date().toISOString(),
-      };
-      gigs.unshift(newGig);
-      this.saveGigs(mentorId, gigs);
-      return newGig;
+      // Create new gig — segment_id must reference an active segment
+      const slug = gigData.title
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+
+      const { data, error } = await supabase
+        .from('gigs')
+        .insert({
+          mentor_id: mentorId,
+          segment_id: gigData.segment_id,
+          title: gigData.title.trim(),
+          slug: slug || `gig-${Date.now()}`,
+          description: gigData.description?.trim() || '',
+          duration_minutes: gigData.duration_minutes,
+          price_inr: gigData.price_inr,
+          deliverables: gigData.deliverables || [],
+          is_published: gigData.is_published ?? true,
+        })
+        .select()
+        .single();
+
+      if (error || !data) {
+        throw new Error(error?.message || 'Failed to create gig.');
+      }
+
+      return data;
     }
   }
 
-  static async deleteGig(gigId: string, mentorId: string = 'evelyn-vasquez'): Promise<boolean> {
-    const gigs = this.getStoredGigs(mentorId);
-    const gig = gigs.find((g) => g.id === gigId || g.slug === gigId);
-    if (!gig) {
-      const err = new Error('Cannot delete gig: you do not have permission to delete this gig.');
-      (err as any).code = 'PERMISSION_DENIED';
-      throw err;
+  static async deleteGig(gigId: string, mentorId: string): Promise<boolean> {
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase not configured. Cannot delete gig.');
     }
-    const filtered = gigs.filter((g) => g.id !== gigId);
-    this.saveGigs(mentorId, filtered);
+
+    const { error } = await supabase
+      .from('gigs')
+      .delete()
+      .eq('id', gigId)
+      .eq('mentor_id', mentorId);
+
+    if (error) {
+      throw new Error(error.message || 'Cannot delete gig: you do not have permission to delete this gig.');
+    }
+
     return true;
   }
 
   /**
-   * Get availability schedule
+   * Get availability schedule (stored in localStorage as UI preference)
    */
-  static async getAvailability(mentorId: string = 'evelyn-vasquez'): Promise<AvailabilitySlotRule[]> {
+  static async getAvailability(mentorId: string = 'current'): Promise<AvailabilitySlotRule[]> {
+    const STORAGE_KEY_AVAILABILITY = 'suggestkey_mentor_availability';
     try {
       const data = localStorage.getItem(STORAGE_KEY_AVAILABILITY);
       if (data) return JSON.parse(data);
     } catch (e) {
       console.warn('LocalStorage error reading availability', e);
     }
-    localStorage.setItem(STORAGE_KEY_AVAILABILITY, JSON.stringify(DEFAULT_AVAILABILITY));
     return DEFAULT_AVAILABILITY;
   }
 
   /**
-   * Save availability schedule
+   * Save availability schedule (stored in localStorage as UI preference)
    */
   static async saveAvailability(rules: AvailabilitySlotRule[]): Promise<AvailabilitySlotRule[]> {
+    const STORAGE_KEY_AVAILABILITY = 'suggestkey_mentor_availability';
     try {
       localStorage.setItem(STORAGE_KEY_AVAILABILITY, JSON.stringify(rules));
     } catch (e) {
@@ -186,34 +236,68 @@ export class MentorStudioService {
   }
 
   /**
-   * Get earnings summary
+   * Get earnings summary from Supabase
    */
-  static async getEarningsStats(mentorId: string = 'evelyn-vasquez'): Promise<MentorEarningsStats> {
-    return {
-      totalGrossInr: 42000,
-      platformFeeInr: 6300,
-      netPayoutInr: 35700,
-      pendingEscrowInr: 7000,
-      completedSessionsCount: 12,
-      upcomingSessionsCount: 2,
-      payoutHistory: [
-        {
-          id: 'po-101',
-          date: '2026-08-25',
-          amountInr: 18500,
-          status: 'transferred',
-          bankAccountEnding: '••• 4912',
-          utrNumber: 'UTR-HDFC-992019482',
-        },
-        {
-          id: 'po-102',
-          date: '2026-08-10',
-          amountInr: 17200,
-          status: 'transferred',
-          bankAccountEnding: '••• 4912',
-          utrNumber: 'UTR-HDFC-883921004',
-        },
-      ],
-    };
+  static async getEarningsStats(mentorId: string): Promise<MentorEarningsStats> {
+    if (!isSupabaseConfigured) {
+      return {
+        totalGrossInr: 0,
+        platformFeeInr: 0,
+        netPayoutInr: 0,
+        pendingEscrowInr: 0,
+        completedSessionsCount: 0,
+        upcomingSessionsCount: 0,
+        payoutHistory: [],
+      };
+    }
+
+    try {
+      // Get completed bookings
+      const { data: completedBookings, error: completedError } = await supabase
+        .from('bookings')
+        .select('amount_inr, platform_fee_inr, mentor_payout_inr')
+        .eq('mentor_id', mentorId)
+        .eq('status', 'completed');
+
+      // Get upcoming bookings
+      const { data: upcomingBookings, error: upcomingError } = await supabase
+        .from('bookings')
+        .select('amount_inr')
+        .eq('mentor_id', mentorId)
+        .in('status', ['confirmed', 'in_progress']);
+
+      if (completedError || upcomingError) {
+        console.error('Error fetching earnings:', completedError || upcomingError);
+      }
+
+      const completed = completedBookings || [];
+      const upcoming = upcomingBookings || [];
+
+      const totalGrossInr = completed.reduce((sum, b) => sum + (b.amount_inr || 0), 0);
+      const platformFeeInr = completed.reduce((sum, b) => sum + (b.platform_fee_inr || 0), 0);
+      const netPayoutInr = completed.reduce((sum, b) => sum + (b.mentor_payout_inr || 0), 0);
+      const pendingEscrowInr = upcoming.reduce((sum, b) => sum + (b.amount_inr || 0), 0);
+
+      return {
+        totalGrossInr,
+        platformFeeInr,
+        netPayoutInr,
+        pendingEscrowInr,
+        completedSessionsCount: completed.length,
+        upcomingSessionsCount: upcoming.length,
+        payoutHistory: [], // Would be populated from a payouts table in a full implementation
+      };
+    } catch (err) {
+      console.error('Error in getEarningsStats:', err);
+      return {
+        totalGrossInr: 0,
+        platformFeeInr: 0,
+        netPayoutInr: 0,
+        pendingEscrowInr: 0,
+        completedSessionsCount: 0,
+        upcomingSessionsCount: 0,
+        payoutHistory: [],
+      };
+    }
   }
 }

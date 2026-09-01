@@ -5,7 +5,7 @@ import { useToast } from '../../components/ui/Toast';
 import { BookingService, EnrichedBooking } from '../../domains/booking/BookingService';
 import { MessagingService, ChatChannel, ChatMessage } from '../../domains/messaging/MessagingService';
 import { AdvisorService } from '../../domains/advisor/AdvisorService';
-import { AdvisorDetail } from '../../domains/advisor/seedData';
+import { AdvisorDetail } from '../../domains/advisor/AdvisorService';
 import { ReviewService, ReviewDetail } from '../../domains/reviews/ReviewService';
 import { AdminService } from '../../domains/admin/AdminService';
 import { BookingCheckoutModal } from '../../components/booking/BookingCheckoutModal';

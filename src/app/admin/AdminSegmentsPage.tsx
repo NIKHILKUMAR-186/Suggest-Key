@@ -85,12 +85,14 @@ export const AdminSegmentsPage: React.FC = () => {
   const [newUseCaseInput, setNewUseCaseInput] = useState('');
   const [formDisplayOrder, setFormDisplayOrder] = useState(1);
   const [formIsActive, setFormIsActive] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const { toast } = useToast();
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const all = await SegmentService.getAllSegments(true);
       setSegments(all);
@@ -98,11 +100,21 @@ export const AdminSegmentsPage: React.FC = () => {
       // Load metrics for each segment
       const metricsMap: Record<string, any> = {};
       for (const s of all) {
-        metricsMap[s.id] = await SegmentService.getSegmentMetrics(s.id);
+        try {
+          metricsMap[s.id] = await SegmentService.getSegmentMetrics(s.id);
+        } catch (metricsErr: any) {
+          console.error('[AdminSegments] Failed to load metrics for segment:', s.id, metricsErr.message);
+          metricsMap[s.id] = { totalAdvisorsCount: 0, totalBookingsCount: 0, totalRevenueInr: 0 };
+        }
       }
       setMetrics(metricsMap);
-    } catch (err) {
-      console.error('Failed to load segments', err);
+    } catch (err: any) {
+      console.error('[AdminSegments] Failed to load segments', err);
+      setError(err.message || 'Failed to load advisory segments. Please ensure you are authenticated and have the required permissions.');
+      toast({
+        title: 'Failed to Load Segments',
+        description: err.message || 'Unable to fetch advisory segments from database.',
+      });
     } finally {
       setLoading(false);
     }
@@ -386,6 +398,17 @@ export const AdminSegmentsPage: React.FC = () => {
             <div className="w-5 h-5 rounded-full border-2 border-[#8052ff] border-t-transparent animate-spin" />
             <span>Connecting to advisory segment records...</span>
           </div>
+        ) : error ? (
+          <div className="p-12 text-center text-xs text-red-400 space-y-3">
+            <p className="font-medium">Error Loading Segments</p>
+            <p className="text-[#9a9a9a]">{error}</p>
+            <button
+              onClick={loadData}
+              className="px-4 py-2 rounded-full bg-[#8052ff] text-white text-xs font-semibold uppercase"
+            >
+              Retry
+            </button>
+          </div>
         ) : segments.length === 0 ? (
           <div className="p-12 text-center text-xs text-[#9a9a9a] space-y-3">
             <p>No advisory segments found in the database.</p>
@@ -393,7 +416,7 @@ export const AdminSegmentsPage: React.FC = () => {
               onClick={openCreateModal}
               className="px-4 py-2 rounded-full bg-[#8052ff] text-white text-xs font-semibold uppercase"
             >
-              Create Seed Segment
+              Create First Segment
             </button>
           </div>
         ) : (

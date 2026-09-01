@@ -1,8 +1,9 @@
 import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
-import { AdvisorySegment, INITIAL_SEED_SEGMENTS, SegmentMetrics } from './SegmentTypes';
+import { AdvisorySegment, SegmentMetrics } from './SegmentTypes';
 import { Category } from '../../lib/supabase/types';
 
-const STORAGE_KEY_SEGMENTS = 'suggestkey_advisory_segments_db';
+// Re-export AdvisorySegment for consumers that need the type
+export type { AdvisorySegment, SegmentMetrics } from './SegmentTypes';
 
 function normalizeSegment(raw: any): AdvisorySegment {
   const useCases = Array.isArray(raw.use_cases)
@@ -55,106 +56,75 @@ function normalizeSegment(raw: any): AdvisorySegment {
 }
 
 export class SegmentService {
-  private static getLocalSegments(): AdvisorySegment[] {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_SEGMENTS);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map(normalizeSegment);
-        }
-      }
-    } catch {
-      // Fall through to initial seeds
-    }
-
-    const seeds = INITIAL_SEED_SEGMENTS.map(normalizeSegment);
-    this.saveLocalSegments(seeds);
-    return seeds;
-  }
-
-  private static saveLocalSegments(segments: AdvisorySegment[]): void {
-    try {
-      localStorage.setItem(STORAGE_KEY_SEGMENTS, JSON.stringify(segments));
-    } catch (e) {
-      console.warn('Failed to save segments to localStorage', e);
-    }
-  }
-
   /**
    * Fetch all active advisory segments ordered by display_order (For Seeker UI & Public Discovery)
+   * Throws on database errors to distinguish from empty results.
    */
   static async getActiveSegments(): Promise<AdvisorySegment[]> {
     if (!isSupabaseConfigured) {
-      const local = this.getLocalSegments();
-      return local
-        .filter((s) => s.is_active)
-        .sort((a, b) => a.display_order - b.display_order);
+      throw new Error('Supabase not configured. Cannot fetch segments.');
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('advisory_segments')
-        .select('*')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
+    const { data, error } = await supabase
+      .from('advisory_segments')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true });
 
-      if (error || !data || data.length === 0) {
-        const local = this.getLocalSegments();
-        return local
-          .filter((s) => s.is_active)
-          .sort((a, b) => a.display_order - b.display_order);
-      }
-
-      return data.map(normalizeSegment);
-    } catch {
-      const local = this.getLocalSegments();
-      return local
-        .filter((s) => s.is_active)
-        .sort((a, b) => a.display_order - b.display_order);
+    if (error) {
+      console.error('[SegmentService] getActiveSegments error:', error.message);
+      throw new Error(`Failed to fetch active segments: ${error.message}`);
     }
+
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    return data.map(normalizeSegment);
   }
 
   /**
    * Fetch all advisory segments including inactive (For Admin Management)
+   * Throws on database errors to distinguish from empty results.
    */
   static async getAllSegments(includeInactive = true): Promise<AdvisorySegment[]> {
     if (!isSupabaseConfigured) {
-      const local = this.getLocalSegments();
-      const filtered = includeInactive ? local : local.filter((s) => s.is_active);
-      return filtered.sort((a, b) => a.display_order - b.display_order);
+      throw new Error('Supabase not configured. Cannot fetch segments.');
     }
 
-    try {
-      let query = supabase.from('advisory_segments').select('*');
-      if (!includeInactive) {
-        query = query.eq('is_active', true);
-      }
-      const { data, error } = await query.order('display_order', { ascending: true });
-
-      if (error || !data || data.length === 0) {
-        const local = this.getLocalSegments();
-        const filtered = includeInactive ? local : local.filter((s) => s.is_active);
-        return filtered.sort((a, b) => a.display_order - b.display_order);
-      }
-
-      return data.map(normalizeSegment);
-    } catch {
-      const local = this.getLocalSegments();
-      const filtered = includeInactive ? local : local.filter((s) => s.is_active);
-      return filtered.sort((a, b) => a.display_order - b.display_order);
+    let query = supabase.from('advisory_segments').select('*');
+    if (!includeInactive) {
+      query = query.eq('is_active', true);
     }
+    const { data, error } = await query.order('display_order', { ascending: true });
+
+    if (error) {
+      console.error('[SegmentService] getAllSegments error:', error.message);
+      throw new Error(`Failed to fetch segments: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    return data.map(normalizeSegment);
   }
 
   /**
    * Get synchronous cached segment by slug or ID
+   * Note: This now requires pre-fetched data since we don't use localStorage
    */
+  static cachedSegments: AdvisorySegment[] = [];
+
+  static setCachedSegments(segments: AdvisorySegment[]) {
+    this.cachedSegments = segments;
+  }
+
   static getCachedSegmentBySlug(slugOrId?: string): AdvisorySegment | null {
     if (!slugOrId) return null;
     const normalized = slugOrId.toLowerCase().trim();
-    const local = this.getLocalSegments();
     return (
-      local.find(
+      this.cachedSegments.find(
         (s) => s.slug.toLowerCase() === normalized || s.id.toLowerCase() === normalized
       ) || null
     );
@@ -168,11 +138,8 @@ export class SegmentService {
     const normalized = slugOrId.toLowerCase().trim();
 
     if (!isSupabaseConfigured) {
-      const local = this.getLocalSegments();
-      const match = local.find(
-        (s) => s.slug.toLowerCase() === normalized || s.id.toLowerCase() === normalized
-      );
-      return match || null;
+      console.warn('Supabase not configured. Cannot fetch segment.');
+      return null;
     }
 
     try {
@@ -183,22 +150,14 @@ export class SegmentService {
         .single();
 
       if (error || !data) {
-        const local = this.getLocalSegments();
-        return (
-          local.find(
-            (s) => s.slug.toLowerCase() === normalized || s.id.toLowerCase() === normalized
-          ) || null
-        );
+        console.error('Error fetching segment:', error);
+        return null;
       }
 
       return normalizeSegment(data);
-    } catch {
-      const local = this.getLocalSegments();
-      return (
-        local.find(
-          (s) => s.slug.toLowerCase() === normalized || s.id.toLowerCase() === normalized
-        ) || null
-      );
+    } catch (err) {
+      console.error('Error in getSegmentBySlug:', err);
+      return null;
     }
   }
 
@@ -207,66 +166,45 @@ export class SegmentService {
    */
   static async createSegment(
     segmentData: Partial<AdvisorySegment> & { name: string; slug: string; short_description: string; description: string }
-  ): Promise<AdvisorySegment> {
-    const cleanSlug = segmentData.slug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-').replace(/--+/g, '-');
-    const existing = await this.getAllSegments(true);
-    const maxOrder = existing.reduce((max, s) => Math.max(max, s.display_order), 0);
-
-    const newSegment: AdvisorySegment = normalizeSegment({
-      id: cleanSlug,
-      name: segmentData.name.trim(),
-      slug: cleanSlug,
-      short_description: segmentData.short_description.trim(),
-      description: segmentData.description.trim(),
-      icon: segmentData.icon || 'Sparkles',
-      accent: segmentData.accent || '#8052ff',
-      use_cases: segmentData.use_cases || [],
-      audience: segmentData.audience || 'Seekers & Professionals',
-      advisor_types: segmentData.advisor_types || `${segmentData.name} Specialists`,
-      is_active: segmentData.is_active !== undefined ? segmentData.is_active : true,
-      display_order: segmentData.display_order ?? (maxOrder + 1),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase
-          .from('advisory_segments')
-          .insert({
-            id: newSegment.id,
-            name: newSegment.name,
-            slug: newSegment.slug,
-            short_description: newSegment.short_description,
-            description: newSegment.description,
-            icon: newSegment.icon,
-            accent: newSegment.accent,
-            use_cases: newSegment.use_cases,
-            audience: newSegment.audience,
-            advisor_types: newSegment.advisor_types,
-            is_active: newSegment.is_active,
-            display_order: newSegment.display_order,
-          })
-          .select()
-          .single();
-
-        if (!error && data) {
-          const created = normalizeSegment(data);
-          // Also sync local cache
-          const localList = this.getLocalSegments();
-          this.saveLocalSegments([...localList.filter((s) => s.id !== created.id), created]);
-          return created;
-        }
-      } catch (err) {
-        console.warn('Supabase segment insertion fallback', err);
-      }
+  ): Promise<AdvisorySegment | null> {
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Cannot create segment.');
+      return null;
     }
 
-    // Local fallback persistence
-    const localList = this.getLocalSegments();
-    const updatedList = [...localList.filter((s) => s.slug !== cleanSlug && s.id !== newSegment.id), newSegment];
-    this.saveLocalSegments(updatedList);
-    return newSegment;
+    try {
+      const cleanSlug = segmentData.slug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-').replace(/--+/g, '-');
+      const existing = await this.getAllSegments(true);
+      const maxOrder = existing.reduce((max, s) => Math.max(max, s.display_order), 0);
+
+      const { data, error } = await supabase
+        .from('advisory_segments')
+        .insert({
+          name: segmentData.name.trim(),
+          slug: cleanSlug,
+          short_description: segmentData.short_description.trim(),
+          description: segmentData.description.trim(),
+          icon: segmentData.icon || 'Sparkles',
+          accent: segmentData.accent || '#8052ff',
+          use_cases: segmentData.use_cases || [],
+          audience: segmentData.audience || 'Seekers & Professionals',
+          advisor_types: segmentData.advisor_types || [`${segmentData.name} Specialists`],
+          is_active: segmentData.is_active !== undefined ? segmentData.is_active : true,
+          display_order: segmentData.display_order ?? (maxOrder + 1),
+        })
+        .select()
+        .single();
+
+      if (error || !data) {
+        console.error('Error creating segment:', error);
+        return null;
+      }
+
+      return normalizeSegment(data);
+    } catch (err) {
+      console.error('Error in createSegment:', err);
+      return null;
+    }
   }
 
   /**
@@ -276,53 +214,45 @@ export class SegmentService {
     id: string,
     updates: Partial<AdvisorySegment>
   ): Promise<AdvisorySegment | null> {
-    const cleanId = id.trim();
-    const existing = await this.getSegmentBySlug(cleanId);
-    if (!existing) return null;
-
-    const merged = normalizeSegment({
-      ...existing,
-      ...updates,
-      updated_at: new Date().toISOString(),
-    });
-
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase
-          .from('advisory_segments')
-          .update({
-            name: merged.name,
-            slug: merged.slug,
-            short_description: merged.short_description,
-            description: merged.description,
-            icon: merged.icon,
-            accent: merged.accent,
-            use_cases: merged.use_cases,
-            audience: merged.audience,
-            advisor_types: merged.advisor_types,
-            is_active: merged.is_active,
-            display_order: merged.display_order,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', cleanId)
-          .select()
-          .single();
-
-        if (!error && data) {
-          const updated = normalizeSegment(data);
-          const localList = this.getLocalSegments();
-          this.saveLocalSegments(localList.map((s) => (s.id === cleanId ? updated : s)));
-          return updated;
-        }
-      } catch (err) {
-        console.warn('Supabase segment update fallback', err);
-      }
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Cannot update segment.');
+      return null;
     }
 
-    const localList = this.getLocalSegments();
-    const updatedList = localList.map((s) => (s.id === cleanId || s.slug === cleanId ? merged : s));
-    this.saveLocalSegments(updatedList);
-    return merged;
+    try {
+      const existing = await this.getSegmentBySlug(id);
+      if (!existing) return null;
+
+      const { data, error } = await supabase
+        .from('advisory_segments')
+        .update({
+          name: updates.name || existing.name,
+          slug: updates.slug || existing.slug,
+          short_description: updates.short_description || existing.short_description,
+          description: updates.description || existing.description,
+          icon: updates.icon || existing.icon,
+          accent: updates.accent || existing.accent,
+          use_cases: updates.use_cases || existing.use_cases,
+          audience: updates.audience || existing.audience,
+          advisor_types: updates.advisor_types || existing.advisor_types,
+          is_active: updates.is_active !== undefined ? updates.is_active : existing.is_active,
+          display_order: updates.display_order || existing.display_order,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error || !data) {
+        console.error('Error updating segment:', error);
+        return null;
+      }
+
+      return normalizeSegment(data);
+    } catch (err) {
+      console.error('Error in updateSegment:', err);
+      return null;
+    }
   }
 
   /**
@@ -338,94 +268,121 @@ export class SegmentService {
    * Reorder segments
    */
   static async reorderSegments(orderedIds: string[]): Promise<boolean> {
-    const all = await this.getAllSegments(true);
-    const updatedList = all.map((seg) => {
-      const idx = orderedIds.indexOf(seg.id);
-      return {
-        ...seg,
-        display_order: idx !== -1 ? idx + 1 : seg.display_order,
-      };
-    });
-
-    this.saveLocalSegments(updatedList);
-
-    if (isSupabaseConfigured) {
-      try {
-        for (const seg of updatedList) {
-          await supabase
-            .from('advisory_segments')
-            .update({ display_order: seg.display_order })
-            .eq('id', seg.id);
-        }
-      } catch (err) {
-        console.warn('Supabase reorder sync error', err);
-      }
+    if (!isSupabaseConfigured) {
+      return false;
     }
 
-    return true;
+    try {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await supabase
+          .from('advisory_segments')
+          .update({ display_order: i + 1 })
+          .eq('id', orderedIds[i]);
+      }
+      return true;
+    } catch (err) {
+      console.error('Error reordering segments:', err);
+      return false;
+    }
   }
 
   /**
-   * Delete segment safely — Enforces check for existing advisors and bookings
+   * Delete segment safely — Enforces check for existing advisors
    */
   static async deleteSegment(id: string): Promise<{ success: boolean; error?: string }> {
-    // Check if segment is in use
-    const cleanId = id.trim();
-    if (isSupabaseConfigured) {
-      try {
-        const { count: mentorCount } = await supabase
-          .from('mentors')
-          .select('*', { count: 'exact', head: true })
-          .or(`primary_segment_id.eq.${cleanId},verified_categories.cs.{${cleanId}}`);
-
-        if (mentorCount && mentorCount > 0) {
-          return {
-            success: false,
-            error: `Cannot delete segment: ${mentorCount} advisors are assigned to it. Deactivate instead to preserve historical records.`,
-          };
-        }
-
-        const { error } = await supabase.from('advisory_segments').delete().eq('id', cleanId);
-        if (error) {
-          return { success: false, error: error.message };
-        }
-      } catch (e: any) {
-        console.warn('Supabase delete segment error', e);
-      }
+    if (!isSupabaseConfigured) {
+      return { success: false, error: 'Supabase not configured' };
     }
 
-    const localList = this.getLocalSegments();
-    const filtered = localList.filter((s) => s.id !== cleanId && s.slug !== cleanId);
-    this.saveLocalSegments(filtered);
-    return { success: true };
+    try {
+      const cleanId = id.trim();
+
+      // Check if segment is in use
+      const { count: mentorCount } = await supabase
+        .from('mentors')
+        .select('*', { count: 'exact', head: true })
+        .or(`primary_segment_id.eq.${cleanId},verified_categories.cs.{${cleanId}}`);
+
+      if (mentorCount && mentorCount > 0) {
+        return {
+          success: false,
+          error: `Cannot delete segment: ${mentorCount} advisors are assigned to it. Deactivate instead to preserve historical records.`,
+        };
+      }
+
+      const { error } = await supabase.from('advisory_segments').delete().eq('id', cleanId);
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (e: any) {
+      console.error('Error deleting segment:', e);
+      return { success: false, error: e.message || 'Failed to delete segment' };
+    }
   }
 
   /**
-    * Calculate live segment analytics and metrics dynamically
-    */
+   * Calculate live segment analytics and metrics dynamically
+   */
   static async getSegmentMetrics(segmentIdOrSlug?: string): Promise<SegmentMetrics[]> {
-    const segments = await this.getAllSegments(true);
-    const metrics: SegmentMetrics[] = [];
-
-    for (const segment of segments) {
-      if (segmentIdOrSlug && segment.id !== segmentIdOrSlug && segment.slug !== segmentIdOrSlug) {
-        continue;
-      }
-      // Aggregate data for this segment - defer to AdminService for live counts
-      metrics.push({
-        segmentId: segment.id,
-        segmentSlug: segment.slug,
-        advisorCount: 0,
-        activeAdvisorCount: 0,
-        bookingsCount: 0,
-        revenueInr: 0,
-        totalAdvisorsCount: 0,
-        totalBookingsCount: 0,
-        totalRevenueInr: 0,
-      });
+    if (!isSupabaseConfigured) {
+      return [];
     }
 
-    return metrics;
+    try {
+      const segments = await this.getAllSegments(true);
+      const metrics: SegmentMetrics[] = [];
+
+      for (const segment of segments) {
+        if (segmentIdOrSlug && segment.id !== segmentIdOrSlug && segment.slug !== segmentIdOrSlug) {
+          continue;
+        }
+
+        // Get advisor count for this segment
+        const { count: advisorCount } = await supabase
+          .from('mentors')
+          .select('*', { count: 'exact', head: true })
+          .or(`segment_id.eq.${segment.id},verified_categories.cs.{${segment.slug}}`);
+
+        const { count: activeAdvisorCount } = await supabase
+          .from('mentors')
+          .select('*', { count: 'exact', head: true })
+          .eq('verification_status', 'approved')
+          .or(`segment_id.eq.${segment.id},verified_categories.cs.{${segment.slug}}`);
+
+        // Get booking count for this segment
+        const { count: bookingsCount } = await supabase
+          .from('bookings')
+          .select('*', { count: 'exact', head: true })
+          .eq('segment_id', segment.id);
+
+        // Get revenue for this segment
+        const { data: bookings } = await supabase
+          .from('bookings')
+          .select('amount_inr')
+          .eq('segment_id', segment.id);
+
+        const revenueInr = bookings?.reduce((sum, b) => sum + (b.amount_inr || 0), 0) || 0;
+
+        metrics.push({
+          segmentId: segment.id,
+          segmentSlug: segment.slug,
+          advisorCount: advisorCount || 0,
+          activeAdvisorCount: activeAdvisorCount || 0,
+          bookingsCount: bookingsCount || 0,
+          revenueInr,
+          totalAdvisorsCount: advisorCount || 0,
+          totalBookingsCount: bookingsCount || 0,
+          totalRevenueInr: revenueInr,
+        });
+      }
+
+      return metrics;
+    } catch (err) {
+      console.error('Error fetching segment metrics:', err);
+      return [];
+    }
   }
 
   /**

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { PublicNav } from '../../components/navigation/PublicNav';
 import { AdvisorService } from '../../domains/advisor/AdvisorService';
-import { AdvisorDetail } from '../../domains/advisor/seedData';
+import { AdvisorDetail } from '../../domains/advisor/AdvisorService';
 import { Badge } from '../../components/ui/Badge';
 import { SegmentService } from '../../domains/segment/SegmentService';
 import {

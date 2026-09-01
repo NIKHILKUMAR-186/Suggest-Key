@@ -1,12 +1,12 @@
+import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
 import { Booking, BookingStatus, Gig, Profile, Mentor } from '../../lib/supabase/types';
-import { SEED_ADVISORS, AdvisorDetail } from '../advisor/seedData';
 import { AvailabilityService } from './AvailabilityService';
 import { SegmentService } from '../segment/SegmentService';
 
 export interface EnrichedBooking extends Booking {
-  gig: Gig;
-  mentor: AdvisorDetail;
-  seeker: Profile;
+  gig?: Gig;
+  mentor?: Mentor & { profile?: Profile };
+  seeker?: Profile;
   platform_fee_inr?: number;
   mentor_payout_inr?: number;
   payment_status?: string;
@@ -15,159 +15,118 @@ export interface EnrichedBooking extends Booking {
   is_anonymous?: boolean;
 }
 
-const STORAGE_KEY = 'suggestkey_bookings_store';
-
-const INITIAL_BOOKINGS: EnrichedBooking[] = [
-  {
-    id: 'bk-001',
-    seeker_id: 'usr-seeker-01',
-    mentor_id: 'evelyn-vasquez',
-    gig_id: 'executive-crossroads',
-    start_time: '2026-09-02T10:00:00Z',
-    end_time: '2026-09-02T10:45:00Z',
-    status: 'confirmed',
-    amount_inr: 3500,
-    platform_fee_inr: 525,
-    mentor_payout_inr: 2975,
-    payment_status: 'paid',
-    meeting_url: 'https://meet.google.com/xyz-eval-burnout',
-    notes: 'Facing acute decision fatigue after Series A close. Need empirical cognitive restructuring protocol before board meeting next week.',
-    created_at: '2026-08-28T14:30:00Z',
-    is_anonymous: false,
-    gig: SEED_ADVISORS[0].gigs[0],
-    mentor: SEED_ADVISORS[0],
-    seeker: {
-      id: 'usr-seeker-01',
-      email: 'alex.rivera@example.com',
-      full_name: 'Alex Rivera',
-      avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-      role: 'seeker',
-      is_anonymous_enabled: false,
-      created_at: '2025-01-01T00:00:00Z',
-      updated_at: '2025-01-01T00:00:00Z',
-    },
-    deliverables_shared: [
-      'Clinical Burnout & Cognitive Load Assessment Matrix (PDF)',
-      '30-Day Boundary Blueprint for Executive Roles',
-    ],
-  },
-  {
-    id: 'bk-002',
-    seeker_id: 'usr-seeker-01',
-    mentor_id: 'marcus-thorne',
-    gig_id: 'system-architecture-audit',
-    start_time: '2026-09-05T14:30:00Z',
-    end_time: '2026-09-05T15:15:00Z',
-    status: 'confirmed',
-    amount_inr: 4500,
-    platform_fee_inr: 675,
-    mentor_payout_inr: 3825,
-    payment_status: 'paid',
-    meeting_url: 'https://meet.google.com/abc-arch-stream',
-    notes: 'Validating our event-driven stream partitioning before 10x traffic spike. Need distributed lock audit.',
-    created_at: '2026-08-29T09:15:00Z',
-    is_anonymous: true,
-    gig: SEED_ADVISORS[1].gigs[0],
-    mentor: SEED_ADVISORS[1],
-    seeker: {
-      id: 'usr-seeker-01',
-      email: 'alex.rivera@example.com',
-      full_name: 'Alex Rivera',
-      avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-      role: 'seeker',
-      is_anonymous_enabled: true,
-      created_at: '2025-01-01T00:00:00Z',
-      updated_at: '2025-01-01T00:00:00Z',
-    },
-  },
-  {
-    id: 'bk-003',
-    seeker_id: 'usr-seeker-01',
-    mentor_id: 'sarah-jenkins',
-    gig_id: 'venture-pitch-teardown',
-    start_time: '2026-08-20T16:00:00Z',
-    end_time: '2026-08-20T16:45:00Z',
-    status: 'completed',
-    amount_inr: 5000,
-    platform_fee_inr: 750,
-    mentor_payout_inr: 4250,
-    payment_status: 'paid',
-    meeting_url: 'https://meet.google.com/vc-pitch-review',
-    notes: 'Pre-seed deck audit for B2B AI observability tool.',
-    created_at: '2026-08-15T11:00:00Z',
-    is_anonymous: false,
-    gig: SEED_ADVISORS[2].gigs[0],
-    mentor: SEED_ADVISORS[2],
-    seeker: {
-      id: 'usr-seeker-01',
-      email: 'alex.rivera@example.com',
-      full_name: 'Alex Rivera',
-      avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-      role: 'seeker',
-      is_anonymous_enabled: false,
-      created_at: '2025-01-01T00:00:00Z',
-      updated_at: '2025-01-01T00:00:00Z',
-    },
-    deliverables_shared: [
-      'VC Objection Playbook & Markup Deck.pdf',
-      'Investor Pipeline Sequencing Formula.xlsx',
-    ],
-    session_notes: 'Founder advised to lead with net dollar retention cohort metrics instead of total user volume.',
-  },
-];
-
 export class BookingService {
-  private static getStoredBookings(): EnrichedBooking[] {
-    try {
-      const data = localStorage.getItem(STORAGE_KEY);
-      if (data) {
-        return JSON.parse(data);
-      }
-    } catch (e) {
-      console.warn('LocalStorage error reading bookings', e);
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_BOOKINGS));
-    return INITIAL_BOOKINGS;
-  }
-
-  private static saveBookings(bookings: EnrichedBooking[]) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
-    } catch (e) {
-      console.warn('LocalStorage error saving bookings', e);
-    }
-  }
-
   /**
-   * Get all bookings for a seeker
+   * Get all bookings for a seeker from Supabase
    */
   static async getSeekerBookings(seekerId?: string): Promise<EnrichedBooking[]> {
-    const all = this.getStoredBookings();
-    if (!seekerId) return all;
-    return all.filter((b) => b.seeker_id === seekerId || b.seeker.id === seekerId || seekerId === 'usr-seeker-01');
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Returning empty bookings.');
+      return [];
+    }
+
+    try {
+      let query = supabase
+        .from('bookings')
+        .select(`
+          *,
+          gig:gigs(*),
+          mentor:mentors(*, profile:profiles(*)),
+          seeker:profiles(*)
+        `)
+        .order('start_time', { ascending: false });
+
+      if (seekerId) {
+        query = query.eq('seeker_id', seekerId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching seeker bookings:', error);
+        return [];
+      }
+
+      return (data || []).map(this.enrichBooking);
+    } catch (err) {
+      console.error('Error in getSeekerBookings:', err);
+      return [];
+    }
   }
 
   /**
-   * Get all bookings for a mentor
+   * Get all bookings for a mentor from Supabase
    */
   static async getMentorBookings(mentorId?: string): Promise<EnrichedBooking[]> {
-    const all = this.getStoredBookings();
-    if (!mentorId) return all;
-    return all.filter(
-      (b) => b.mentor_id === mentorId || b.mentor.id === mentorId || mentorId === 'evelyn-vasquez' || mentorId === 'usr-mentor-01'
-    );
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Returning empty bookings.');
+      return [];
+    }
+
+    try {
+      let query = supabase
+        .from('bookings')
+        .select(`
+          *,
+          gig:gigs(*),
+          mentor:mentors(*, profile:profiles(*)),
+          seeker:profiles(*)
+        `)
+        .order('start_time', { ascending: false });
+
+      if (mentorId) {
+        query = query.eq('mentor_id', mentorId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching mentor bookings:', error);
+        return [];
+      }
+
+      return (data || []).map(this.enrichBooking);
+    } catch (err) {
+      console.error('Error in getMentorBookings:', err);
+      return [];
+    }
   }
 
   /**
-   * Get booking by ID
+   * Get booking by ID from Supabase
    */
   static async getBookingById(bookingId: string): Promise<EnrichedBooking | null> {
-    const all = this.getStoredBookings();
-    return all.find((b) => b.id === bookingId) || null;
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Cannot fetch booking.');
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          gig:gigs(*),
+          mentor:mentors(*, profile:profiles(*)),
+          seeker:profiles(*)
+        `)
+        .eq('id', bookingId)
+        .single();
+
+      if (error || !data) {
+        console.error('Error fetching booking:', error);
+        return null;
+      }
+
+      return this.enrichBooking(data);
+    } catch (err) {
+      console.error('Error in getBookingById:', err);
+      return null;
+    }
   }
 
   /**
-   * Atomic Booking execution with server/store concurrency lock & conflict checks
+   * Create a new booking with conflict detection
    */
   static async createAtomicBooking(params: {
     seekerId: string;
@@ -182,85 +141,123 @@ export class BookingService {
     isAnonymous?: boolean;
     lockId?: string;
   }): Promise<{ success: boolean; booking?: EnrichedBooking; error?: string; message?: string }> {
-    const all = this.getStoredBookings();
-    const reqStart = new Date(params.startTime).getTime();
-    const reqEnd = new Date(params.endTime).getTime();
-
-    // 1. Double booking conflict check: ensure no active booking exists for this mentor in this time window
-    const conflict = all.find((b) => {
-      if (b.status === 'cancelled') return false;
-      if (b.mentor_id !== params.mentorId && b.mentor.id !== params.mentorId) return false;
-      const bStart = new Date(b.start_time).getTime();
-      const bEnd = new Date(b.end_time).getTime();
-      return reqStart < bEnd && reqEnd > bStart;
-    });
-
-    if (conflict) {
+    if (!isSupabaseConfigured) {
       return {
         success: false,
-        error: 'SLOT_CONFLICT',
-        message: 'This time slot has just been confirmed by another client. Please select an alternate schedule.',
+        error: 'SUPABASE_NOT_CONFIGURED',
+        message: 'Database is not configured. Cannot create booking.',
       };
     }
 
-    const mentor = SEED_ADVISORS.find((a) => a.id === params.mentorId) || SEED_ADVISORS[0];
-    const gig = mentor.gigs.find((g) => g.id === params.gigId) || mentor.gigs[0];
+    try {
+      // Fetch the gig details
+      const { data: gigData, error: gigError } = await supabase
+        .from('gigs')
+        .select('*')
+        .eq('id', params.gigId)
+        .single();
 
-    // 2. Verification constraint: if the gig's segment requires credential verification, mentor must be approved
-    const seg = SegmentService.getCachedSegmentBySlug(gig.segment_id);
-    if (seg?.requiresCredentialVerification && mentor.verification_status !== 'approved') {
+      if (gigError || !gigData) {
+        return {
+          success: false,
+          error: 'GIG_NOT_FOUND',
+          message: 'The selected session offering was not found.',
+        };
+      }
+
+      // Check for booking conflicts
+      const { data: conflicts, error: conflictError } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('mentor_id', params.mentorId)
+        .in('status', ['pending', 'confirmed', 'in_progress'])
+        .lt('start_time', params.endTime)
+        .gt('end_time', params.startTime);
+
+      if (conflictError) {
+        console.error('Error checking conflicts:', conflictError);
+      }
+
+      if (conflicts && conflicts.length > 0) {
+        return {
+          success: false,
+          error: 'SLOT_CONFLICT',
+          message: 'This time slot has just been confirmed by another client. Please select an alternate schedule.',
+        };
+      }
+
+      // Calculate fees
+      const platformFee = Math.round(gigData.price_inr * 0.15);
+      const mentorPayout = gigData.price_inr - platformFee;
+
+      // Create the booking
+      const { data: bookingData, error: bookingError } = await supabase
+        .from('bookings')
+        .insert({
+          seeker_id: params.seekerId,
+          mentor_id: params.mentorId,
+          gig_id: params.gigId,
+          segment_id: gigData.segment_id,
+          start_time: params.startTime,
+          end_time: params.endTime,
+          status: 'confirmed',
+          amount_inr: gigData.price_inr,
+          platform_fee_inr: platformFee,
+          mentor_payout_inr: mentorPayout,
+          meeting_url: `https://meet.google.com/sk-${Math.random().toString(36).substring(2, 7)}`,
+          notes: params.notes || '1:1 Advisory Consultation',
+          is_anonymous: params.isAnonymous ?? false,
+        })
+        .select(`
+          *,
+          gig:gigs(*),
+          mentor:mentors(*, profile:profiles(*)),
+          seeker:profiles(*)
+        `)
+        .single();
+
+      if (bookingError || !bookingData) {
+        if (bookingError?.message?.includes('exclusion')) {
+          return {
+            success: false,
+            error: 'SLOT_CONFLICT',
+            message: 'This time slot has just been confirmed by another client. Please select an alternate schedule.',
+          };
+        }
+        return {
+          success: false,
+          error: 'BOOKING_FAILED',
+          message: bookingError?.message || 'Failed to create booking.',
+        };
+      }
+
+      // Create conversation for this booking
+      await supabase
+        .from('conversations')
+        .insert({
+          booking_id: bookingData.id,
+          seeker_id: params.seekerId,
+          mentor_id: params.mentorId,
+          segment_id: gigData.segment_id,
+        });
+
+      // Release slot lock if provided
+      if (params.lockId) {
+        AvailabilityService.releaseLock(params.lockId);
+      }
+
+      return {
+        success: true,
+        booking: this.enrichBooking(bookingData),
+      };
+    } catch (err: any) {
+      console.error('Error in createAtomicBooking:', err);
       return {
         success: false,
-        error: 'MENTOR_NOT_VERIFIED',
-        message: 'This advisor is currently undergoing credential verification audit. Bookings for this category are temporarily locked.',
+        error: 'BOOKING_ERROR',
+        message: err.message || 'An unexpected error occurred while creating the booking.',
       };
     }
-
-    const platformFee = Math.round(gig.price_inr * 0.15);
-    const mentorPayout = gig.price_inr - platformFee;
-
-    const newBookingId = `bk-${Date.now().toString().slice(-6)}`;
-    const newBooking: EnrichedBooking = {
-      id: newBookingId,
-      seeker_id: params.seekerId,
-      mentor_id: mentor.id,
-      gig_id: gig.id,
-      start_time: params.startTime,
-      end_time: params.endTime,
-      status: 'confirmed',
-      amount_inr: gig.price_inr,
-      platform_fee_inr: platformFee,
-      mentor_payout_inr: mentorPayout,
-      payment_status: 'paid',
-      meeting_url: `https://meet.google.com/sk-${Math.random().toString(36).substring(2, 7)}`,
-      notes: params.notes || '1:1 Advisory Consultation',
-      created_at: new Date().toISOString(),
-      is_anonymous: params.isAnonymous ?? false,
-      gig,
-      mentor,
-      seeker: {
-        id: params.seekerId,
-        email: params.seekerEmail || 'alex.rivera@example.com',
-        full_name: params.seekerName || 'Alex Rivera',
-        avatar_url: params.seekerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-        role: 'seeker',
-        is_anonymous_enabled: params.isAnonymous ?? false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    };
-
-    all.unshift(newBooking);
-    this.saveBookings(all);
-
-    if (params.lockId) {
-      AvailabilityService.releaseLock(params.lockId);
-    }
-
-    return {
-      success: true,
-      booking: newBooking,
-    };
   }
 
   /**
@@ -290,22 +287,147 @@ export class BookingService {
     status: BookingStatus,
     extra?: { session_notes?: string; deliverables_shared?: string[] }
   ): Promise<EnrichedBooking | null> {
-    const all = this.getStoredBookings();
-    const index = all.findIndex((b) => b.id === bookingId);
-    if (index === -1) return null;
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Cannot update booking.');
+      return null;
+    }
 
-    all[index] = {
-      ...all[index],
-      status,
-      session_notes: extra?.session_notes !== undefined ? extra.session_notes : all[index].session_notes,
-      deliverables_shared: extra?.deliverables_shared !== undefined ? extra.deliverables_shared : all[index].deliverables_shared,
-    };
+    try {
+      const updateData: any = { status };
 
-    this.saveBookings(all);
-    return all[index];
+      if (extra?.session_notes !== undefined) {
+        updateData.notes = extra.session_notes;
+      }
+
+      const { data, error } = await supabase
+        .from('bookings')
+        .update(updateData)
+        .eq('id', bookingId)
+        .select(`
+          *,
+          gig:gigs(*),
+          mentor:mentors(*, profile:profiles(*)),
+          seeker:profiles(*)
+        `)
+        .single();
+
+      if (error || !data) {
+        console.error('Error updating booking status:', error);
+        return null;
+      }
+
+      return this.enrichBooking(data);
+    } catch (err) {
+      console.error('Error in updateBookingStatus:', err);
+      return null;
+    }
   }
 
+  /**
+   * Get all bookings (admin use)
+   */
   static async getAllBookings(): Promise<EnrichedBooking[]> {
-    return this.getStoredBookings();
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Returning empty bookings.');
+      return [];
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          gig:gigs(*),
+          mentor:mentors(*, profile:profiles(*)),
+          seeker:profiles(*)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching all bookings:', error);
+        return [];
+      }
+
+      return (data || []).map(this.enrichBooking);
+    } catch (err) {
+      console.error('Error in getAllBookings:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Get booking statistics for admin dashboard
+   */
+  static async getBookingStats(): Promise<{
+    totalBookings: number;
+    confirmedBookings: number;
+    completedBookings: number;
+    cancelledBookings: number;
+    totalRevenue: number;
+    platformRevenue: number;
+  }> {
+    if (!isSupabaseConfigured) {
+      return {
+        totalBookings: 0,
+        confirmedBookings: 0,
+        completedBookings: 0,
+        cancelledBookings: 0,
+        totalRevenue: 0,
+        platformRevenue: 0,
+      };
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('status, amount_inr, platform_fee_inr');
+
+      if (error || !data) {
+        console.error('Error fetching booking stats:', error);
+        return {
+          totalBookings: 0,
+          confirmedBookings: 0,
+          completedBookings: 0,
+          cancelledBookings: 0,
+          totalRevenue: 0,
+          platformRevenue: 0,
+        };
+      }
+
+      const stats = {
+        totalBookings: data.length,
+        confirmedBookings: data.filter(b => b.status === 'confirmed' || b.status === 'in_progress').length,
+        completedBookings: data.filter(b => b.status === 'completed').length,
+        cancelledBookings: data.filter(b => b.status === 'cancelled').length,
+        totalRevenue: data.reduce((sum, b) => sum + (b.amount_inr || 0), 0),
+        platformRevenue: data.reduce((sum, b) => sum + (b.platform_fee_inr || 0), 0),
+      };
+
+      return stats;
+    } catch (err) {
+      console.error('Error in getBookingStats:', err);
+      return {
+        totalBookings: 0,
+        confirmedBookings: 0,
+        completedBookings: 0,
+        cancelledBookings: 0,
+        totalRevenue: 0,
+        platformRevenue: 0,
+      };
+    }
+  }
+
+  /**
+   * Enrich booking data with computed fields
+   */
+  private static enrichBooking(raw: any): EnrichedBooking {
+    const booking: EnrichedBooking = {
+      ...raw,
+      platform_fee_inr: raw.platform_fee_inr || Math.round((raw.amount_inr || 0) * 0.15),
+      mentor_payout_inr: raw.mentor_payout_inr || Math.round((raw.amount_inr || 0) * 0.85),
+      payment_status: raw.payment_status || 'paid',
+    };
+
+    return booking;
   }
 }

@@ -47,11 +47,15 @@ export const MentorOverviewPage: React.FC = () => {
 
   useEffect(() => {
     async function loadStudio() {
+      if (!profile?.id) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       const [bks, ggs, earn] = await Promise.all([
-        BookingService.getMentorBookings(profile?.id || 'evelyn-vasquez'),
-        MentorStudioService.getMentorGigs(profile?.id || 'evelyn-vasquez'),
-        MentorStudioService.getEarningsStats(profile?.id || 'evelyn-vasquez'),
+        BookingService.getMentorBookings(profile.id),
+        MentorStudioService.getMentorGigs(profile.id),
+        MentorStudioService.getEarningsStats(profile.id),
       ]);
       setBookings(bks);
       setGigs(ggs);
@@ -263,17 +267,22 @@ export const MentorGigsPage: React.FC = () => {
 
   useEffect(() => {
     async function loadGigs() {
+      if (!profile?.id) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
-       const data = await MentorStudioService.getMentorGigs(profile?.id || 'evelyn-vasquez');
+      const data = await MentorStudioService.getMentorGigs(profile.id);
       setGigs(data);
       setLoading(false);
     }
     loadGigs();
-  }, []);
+  }, [profile?.id]);
 
   const handleDelete = async (gigId: string) => {
+    if (!profile?.id) return;
     if (confirm('Are you sure you want to remove this advisory offering?')) {
-      await MentorStudioService.deleteGig(gigId, profile?.id || 'evelyn-vasquez');
+      await MentorStudioService.deleteGig(gigId, profile.id);
       setGigs((prev) => prev.filter((g) => g.id !== gigId));
       toast({ title: 'Gig Removed', description: 'The offering has been archived.' });
     }
@@ -377,28 +386,37 @@ export const MentorGigEditorPage: React.FC = () => {
   const [description, setDescription] = useState('');
   const [durationMinutes, setDurationMinutes] = useState(45);
   const [priceInr, setPriceInr] = useState(3500);
-  const [deliverables, setDeliverables] = useState<string[]>([
-    '45-minute 1:1 confidential advisory consultation',
-    'Written diagnostic framework and roadmap notes',
-  ]);
+  const [deliverables, setDeliverables] = useState<string[]>([]);
   const [newDeliverable, setNewDeliverable] = useState('');
   const [isPublished, setIsPublished] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadGig() {
       setLoading(true);
-      const allSegments = await SegmentService.getAllSegments(true);
-      setSegments(allSegments);
-      if (allSegments.length > 0 && !segmentId) {
-        setSegmentId(allSegments[0].id);
+      setError(null);
+
+      if (!profile?.id) {
+        setError('You must be logged in to manage gigs.');
+        setLoading(false);
+        return;
       }
+
+      const activeSegments = await SegmentService.getActiveSegments();
+      setSegments(activeSegments);
+
+      if (activeSegments.length > 0 && !segmentId) {
+        setSegmentId(activeSegments[0].id);
+      }
+
       if (isNew) {
         setLoading(false);
         return;
       }
-      const gig = await MentorStudioService.getGigById(gigId!, profile?.id || 'evelyn-vasquez');
+
+      const gig = await MentorStudioService.getGigById(gigId!, profile.id);
       if (gig) {
         setTitle(gig.title);
         setSegmentId(gig.segment_id);
@@ -411,7 +429,7 @@ export const MentorGigEditorPage: React.FC = () => {
       setLoading(false);
     }
     loadGig();
-  }, [gigId, isNew]);
+  }, [gigId, isNew, profile?.id]);
 
   const handleAddDeliverable = () => {
     if (!newDeliverable.trim()) return;
@@ -430,24 +448,41 @@ export const MentorGigEditorPage: React.FC = () => {
       return;
     }
 
-    setSaving(true);
-    await MentorStudioService.saveGig({
-      id: isNew ? undefined : gigId,
-      title,
-      segment_id: segmentId,
-      description,
-      duration_minutes: durationMinutes,
-      price_inr: priceInr,
-      deliverables,
-      is_published: isPublished,
-    }, profile?.id || 'evelyn-vasquez');
-    setSaving(false);
+    if (!segmentId) {
+      toast({ title: 'Validation Error', description: 'Please select a specialty domain.' });
+      return;
+    }
 
-    toast({
-      title: isNew ? 'Offering Created' : 'Offering Saved',
-      description: 'Your advisory gig has been successfully updated.',
-    });
-    navigate('/mentor/gigs');
+    if (!profile?.id) {
+      toast({ title: 'Authentication Error', description: 'You must be logged in to save gigs.' });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await MentorStudioService.saveGig({
+        id: isNew ? undefined : gigId,
+        title,
+        segment_id: segmentId,
+        description,
+        duration_minutes: durationMinutes,
+        price_inr: priceInr,
+        deliverables,
+        is_published: isPublished,
+      }, profile.id);
+
+      toast({
+        title: isNew ? 'Offering Created' : 'Offering Saved',
+        description: 'Your advisory gig has been successfully updated.',
+      });
+      navigate('/mentor/gigs');
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to save gig.',
+      });
+    }
+    setSaving(false);
   };
 
   const platformFee = Math.round(priceInr * 0.15);
@@ -465,6 +500,18 @@ export const MentorGigEditorPage: React.FC = () => {
         </h1>
         <p className="text-sm text-[#9a9a9a]">Define session goals, structured deliverables, and compensation terms.</p>
       </div>
+
+      {error && (
+        <div className="p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
+      {segments.length === 0 && !loading && (
+        <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-sm text-amber-300">
+          No active specialty domains available. Please contact an admin to activate segments before creating gigs.
+        </div>
+      )}
 
       <form onSubmit={handleSave} className="space-y-6">
         <div className="p-6 md:p-8 rounded-[24px] border border-white/10 bg-white/[0.02] space-y-6">
@@ -639,17 +686,18 @@ export const MentorGigEditorPage: React.FC = () => {
    4. MENTOR AVAILABILITY & CALENDAR PAGE
    ========================================================================== */
 export const MentorAvailabilityPage: React.FC = () => {
+  const { profile } = useAuth();
   const [schedule, setSchedule] = useState<AvailabilitySlotRule[]>([]);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     async function loadSchedule() {
-      const rules = await MentorStudioService.getAvailability();
+      const rules = await MentorStudioService.getAvailability(profile?.id || 'current');
       setSchedule(rules);
     }
     loadSchedule();
-  }, []);
+  }, [profile?.id]);
 
   const handleToggleDay = (day: string) => {
     setSchedule(
@@ -759,8 +807,12 @@ export const MentorBookingsPage: React.FC = () => {
 
   useEffect(() => {
     async function loadBookings() {
+      if (!profile?.id) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
-      const data = await BookingService.getMentorBookings(profile?.id || 'evelyn-vasquez');
+      const data = await BookingService.getMentorBookings(profile.id);
       setBookings(data);
       setLoading(false);
     }
@@ -1131,8 +1183,12 @@ export const MentorMessagesPage: React.FC = () => {
 
   useEffect(() => {
     async function loadChannels() {
+      if (!profile?.id) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
-      const chs = await MessagingService.getChannels(profile?.id || 'evelyn-vasquez', 'mentor');
+      const chs = await MessagingService.getChannels(profile.id, 'mentor');
       setChannels(chs);
       if (chs.length > 0) {
         setSelectedChannelId(chs[0].id);
@@ -1155,19 +1211,21 @@ export const MentorMessagesPage: React.FC = () => {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || !selectedChannelId) return;
+    if (!inputText.trim() || !selectedChannelId || !profile?.id) return;
 
     const newMsg = await MessagingService.sendMessage({
-      channelId: selectedChannelId,
-      senderId: profile?.id || 'evelyn-vasquez',
-      senderName: profile?.full_name || 'Dr. Evelyn Vasquez',
+      conversationId: selectedChannelId,
+      senderId: profile.id,
+      senderName: profile.full_name || 'Mentor',
       senderRole: 'mentor',
-      senderAvatar: profile?.avatar_url,
+      senderAvatar: profile.avatar_url,
       content: inputText.trim(),
     });
 
-    setMessages((prev) => [...prev, newMsg]);
-    setInputText('');
+    if (newMsg) {
+      setMessages((prev) => [...prev, newMsg]);
+      setInputText('');
+    }
   };
 
   return (
@@ -1307,6 +1365,7 @@ export const MentorMessagesPage: React.FC = () => {
    8. MENTOR EARNINGS & LEDGER PAGE
    ========================================================================== */
 export const MentorEarningsPage: React.FC = () => {
+  const { profile } = useAuth();
   const [stats, setStats] = useState<MentorEarningsStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [payoutRequested, setPayoutRequested] = useState(false);
@@ -1314,13 +1373,17 @@ export const MentorEarningsPage: React.FC = () => {
 
   useEffect(() => {
     async function loadEarnings() {
+      if (!profile?.id) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
-      const data = await MentorStudioService.getEarningsStats();
+      const data = await MentorStudioService.getEarningsStats(profile.id);
       setStats(data);
       setLoading(false);
     }
     loadEarnings();
-  }, []);
+  }, [profile?.id]);
 
   const handleRequestPayout = () => {
     setPayoutRequested(true);
@@ -1409,11 +1472,9 @@ export const MentorProfilePage: React.FC = () => {
   const { profile, updateProfile } = useAuth();
   const { toast } = useToast();
 
-  const [fullName, setFullName] = useState(profile?.full_name || 'Dr. Evelyn Vasquez');
-  const [headline, setHeadline] = useState('Licensed Clinical Psychologist & Executive Burnout Specialist');
-  const [bio, setBio] = useState(
-    'Specializing in acute executive stress, decision fatigue, and systemic organizational wellness protocols. 14+ years empirical practice.'
-  );
+  const [fullName, setFullName] = useState(profile?.full_name || '');
+  const [headline, setHeadline] = useState('');
+  const [bio, setBio] = useState('');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async (e: React.FormEvent) => {

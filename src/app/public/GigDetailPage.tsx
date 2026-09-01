@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { PublicNav } from '../../components/navigation/PublicNav';
 import { AdvisorService } from '../../domains/advisor/AdvisorService';
 import { Gig } from '../../lib/supabase/types';
-import { AdvisorDetail } from '../../domains/advisor/seedData';
+import { AdvisorDetail } from '../../domains/advisor/AdvisorService';
 import { useAuth } from '../../domains/auth/AuthContext';
 import { Badge } from '../../components/ui/Badge';
 import { BookingCheckoutModal } from '../../components/booking/BookingCheckoutModal';

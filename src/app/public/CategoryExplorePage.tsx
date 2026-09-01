@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { PublicNav } from '../../components/navigation/PublicNav';
 import { AdvisorService } from '../../domains/advisor/AdvisorService';
 import { Category } from '../../lib/supabase/types';
-import { AdvisorDetail } from '../../domains/advisor/seedData';
+import { AdvisorDetail } from '../../domains/advisor/AdvisorService';
 import { AdvisorEditorialCard } from '../../components/advisor/AdvisorEditorialCard';
 import { SegmentIntroduction } from '../../components/segment/SegmentIntroduction';
 import {

@@ -4,7 +4,7 @@ import { PublicNav } from '../../components/navigation/PublicNav';
 import { AdvisorEditorialCard } from '../../components/advisor/AdvisorEditorialCard';
 import { AdvisorService } from '../../domains/advisor/AdvisorService';
 import { Category } from '../../lib/supabase/types';
-import { AdvisorDetail } from '../../domains/advisor/seedData';
+import { AdvisorDetail } from '../../domains/advisor/AdvisorService';
 import { AdvisorySegmentSlug } from '../../domains/segment/SegmentTypes';
 import {
   Search,

@@ -1,271 +1,372 @@
+import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
+
 export interface ChatMessage {
   id: string;
-  channel_id: string;
+  conversation_id: string;
   sender_id: string;
-  sender_name: string;
-  sender_role: 'seeker' | 'mentor' | 'system';
+  sender_name?: string;
+  sender_role?: 'seeker' | 'mentor' | 'system';
   sender_avatar?: string;
   content: string;
-  created_at: string;
   attachments?: { name: string; url: string; size?: string }[];
+  created_at: string;
 }
 
 export interface ChatChannel {
   id: string;
-  booking_id: string;
+  booking_id?: string;
   mentor_id: string;
-  mentor_name: string;
+  mentor_name?: string;
   mentor_avatar?: string;
   mentor_headline?: string;
   seeker_id: string;
-  seeker_name: string;
+  seeker_name?: string;
   seeker_avatar?: string;
   last_message?: string;
-  last_message_at: string;
+  last_message_at?: string;
   unread_count: number;
+  created_at: string;
 }
 
-const STORAGE_KEY_CHANNELS = 'suggestkey_chat_channels';
-const STORAGE_KEY_MESSAGES = 'suggestkey_chat_messages';
-
-const INITIAL_CHANNELS: ChatChannel[] = [
-  {
-    id: 'ch-001',
-    booking_id: 'bk-001',
-    mentor_id: 'evelyn-vasquez',
-    mentor_name: 'Dr. Evelyn Vasquez',
-    mentor_avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&auto=format&fit=crop&q=80',
-    mentor_headline: 'Licensed Clinical Psychologist & Executive Burnout Specialist',
-    seeker_id: 'usr-seeker-01',
-    seeker_name: 'Alex Rivera',
-    seeker_avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-    last_message: 'I have attached the cognitive restructuring matrix ahead of our 10 AM session tomorrow.',
-    last_message_at: '2026-08-30T14:15:00Z',
-    unread_count: 1,
-  },
-  {
-    id: 'ch-002',
-    booking_id: 'bk-002',
-    mentor_id: 'marcus-thorne',
-    mentor_name: 'Marcus Thorne',
-    mentor_avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-    mentor_headline: 'Principal Distributed Systems Architect | Ex-Google Staff Eng',
-    seeker_id: 'usr-seeker-01',
-    seeker_name: 'Alex Rivera (Anonymous)',
-    last_message: 'Please send over your partition topology diagram before Friday so I can prepare notes.',
-    last_message_at: '2026-08-29T18:00:00Z',
-    unread_count: 0,
-  },
-  {
-    id: 'ch-003',
-    booking_id: 'bk-003',
-    mentor_id: 'sarah-jenkins',
-    mentor_name: 'Sarah Jenkins',
-    mentor_avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80',
-    mentor_headline: '2x Fintech Founder & Venture Partner | Raised $45M Series A/B',
-    seeker_id: 'usr-seeker-01',
-    seeker_name: 'Alex Rivera',
-    last_message: 'Great session last week! Let me know if you need an intro to the fintech syndicate.',
-    last_message_at: '2026-08-21T10:30:00Z',
-    unread_count: 0,
-  },
-];
-
-const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {
-  'ch-001': [
-    {
-      id: 'msg-1',
-      channel_id: 'ch-001',
-      sender_id: 'usr-seeker-01',
-      sender_name: 'Alex Rivera',
-      sender_role: 'seeker',
-      content: 'Hi Dr. Vasquez, I booked the 45m Executive Crossroads session for tomorrow. Looking forward to structuring actionable mental recovery steps.',
-      created_at: '2026-08-30T11:20:00Z',
-    },
-    {
-      id: 'msg-2',
-      channel_id: 'ch-001',
-      sender_id: 'evelyn-vasquez',
-      sender_name: 'Dr. Evelyn Vasquez',
-      sender_role: 'mentor',
-      sender_avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&auto=format&fit=crop&q=80',
-      content: 'Hello Alex. Welcome. I have prepared our clinical framework. I have attached the cognitive restructuring matrix ahead of our 10 AM session tomorrow.',
-      created_at: '2026-08-30T14:15:00Z',
-      attachments: [
-        {
-          name: 'Burnout_Cognitive_Assessment_Matrix.pdf',
-          url: '#',
-          size: '1.4 MB',
-        },
-      ],
-    },
-  ],
-  'ch-002': [
-    {
-      id: 'msg-201',
-      channel_id: 'ch-002',
-      sender_id: 'usr-seeker-01',
-      sender_name: 'Alex Rivera (Anonymous)',
-      sender_role: 'seeker',
-      content: 'Hi Marcus, excited for our architecture teardown on Friday. We are dealing with high tail latency during peak message ingestion.',
-      created_at: '2026-08-29T16:00:00Z',
-    },
-    {
-      id: 'msg-202',
-      channel_id: 'ch-002',
-      sender_id: 'marcus-thorne',
-      sender_name: 'Marcus Thorne',
-      sender_role: 'mentor',
-      sender_avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-      content: 'Please send over your partition topology diagram before Friday so I can prepare notes.',
-      created_at: '2026-08-29T18:00:00Z',
-    },
-  ],
-  'ch-003': [
-    {
-      id: 'msg-301',
-      channel_id: 'ch-003',
-      sender_id: 'sarah-jenkins',
-      sender_name: 'Sarah Jenkins',
-      sender_role: 'mentor',
-      sender_avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80',
-      content: 'Great session last week! Let me know if you need an intro to the fintech syndicate.',
-      created_at: '2026-08-21T10:30:00Z',
-    },
-  ],
-};
-
 export class MessagingService {
-  private static getStoredChannels(): ChatChannel[] {
-    try {
-      const data = localStorage.getItem(STORAGE_KEY_CHANNELS);
-      if (data) return JSON.parse(data);
-    } catch (e) {
-      console.warn('LocalStorage error reading channels', e);
-    }
-    localStorage.setItem(STORAGE_KEY_CHANNELS, JSON.stringify(INITIAL_CHANNELS));
-    return INITIAL_CHANNELS;
-  }
-
-  private static getStoredMessages(): Record<string, ChatMessage[]> {
-    try {
-      const data = localStorage.getItem(STORAGE_KEY_MESSAGES);
-      if (data) return JSON.parse(data);
-    } catch (e) {
-      console.warn('LocalStorage error reading messages', e);
-    }
-    localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(INITIAL_MESSAGES));
-    return INITIAL_MESSAGES;
-  }
-
-  private static saveChannels(channels: ChatChannel[]) {
-    try {
-      localStorage.setItem(STORAGE_KEY_CHANNELS, JSON.stringify(channels));
-    } catch (e) {
-      console.warn('LocalStorage error saving channels', e);
-    }
-  }
-
-  private static saveMessages(messages: Record<string, ChatMessage[]>) {
-    try {
-      localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(messages));
-    } catch (e) {
-      console.warn('LocalStorage error saving messages', e);
-    }
-  }
-
   /**
-   * Get channels for a user role with participant isolation
+   * Get conversations for a user with participant isolation
    */
   static async getChannels(userId: string, role: 'seeker' | 'mentor' | 'admin'): Promise<ChatChannel[]> {
-    const all = this.getStoredChannels();
-    if (role === 'admin') return all;
-    if (role === 'seeker') {
-      return all.filter(
-        (c) => c.seeker_id === userId || userId === '00000000-0000-0000-0000-000000000001' || userId === 'usr-seeker-01'
-      );
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Returning empty channels.');
+      return [];
     }
-    return all.filter(
-      (c) => c.mentor_id === userId || userId === '00000000-0000-0000-0000-000000000002' || userId === 'evelyn-vasquez' || userId === 'usr-mentor-01'
-    );
+
+    try {
+      let query = supabase
+        .from('conversations')
+        .select(`
+          id,
+          booking_id,
+          seeker_id,
+          mentor_id,
+          last_message_at,
+          created_at,
+          seeker:profiles!conversations_seeker_id_fkey(id, full_name, avatar_url),
+          mentor:mentors!conversations_mentor_id_fkey(
+            id,
+            headline,
+            profile:profiles!mentors_id_fkey(id, full_name, avatar_url)
+          ),
+          messages:messages(id, content, created_at, sender_id)
+        `)
+        .order('last_message_at', { ascending: false, nullsLast: true });
+
+      if (role === 'seeker') {
+        query = query.eq('seeker_id', userId);
+      } else if (role === 'mentor') {
+        query = query.eq('mentor_id', userId);
+      }
+      // Admin sees all conversations
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching channels:', error);
+        return [];
+      }
+
+      return (data || []).map((conv: any) => {
+        const lastMessage = conv.messages?.length > 0
+          ? conv.messages[conv.messages.length - 1]
+          : null;
+
+        const mentorProfile = conv.mentor?.profile || {};
+        const seekerProfile = conv.seeker || {};
+
+        return {
+          id: conv.id,
+          booking_id: conv.booking_id,
+          mentor_id: conv.mentor_id,
+          mentor_name: mentorProfile.full_name || 'Advisor',
+          mentor_avatar: mentorProfile.avatar_url,
+          mentor_headline: conv.mentor?.headline,
+          seeker_id: conv.seeker_id,
+          seeker_name: seekerProfile.full_name || 'Seeker',
+          seeker_avatar: seekerProfile.avatar_url,
+          last_message: lastMessage?.content,
+          last_message_at: lastMessage?.created_at || conv.last_message_at,
+          unread_count: 0, // TODO: Implement unread count tracking
+          created_at: conv.created_at,
+        };
+      });
+    } catch (err) {
+      console.error('Error in getChannels:', err);
+      return [];
+    }
   }
 
   /**
-   * Get single channel by channelId or bookingId with participant authorization
+   * Get single conversation by ID with participant authorization
    */
   static async getChannelById(
-    channelIdOrBookingId: string,
+    conversationIdOrBookingId: string,
     requestingUserId?: string,
     role?: string
   ): Promise<ChatChannel | null> {
-    const all = this.getStoredChannels();
-    const channel = all.find(
-      (c) => c.id === channelIdOrBookingId || c.booking_id === channelIdOrBookingId
-    );
-    if (!channel) return null;
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Cannot fetch channel.');
+      return null;
+    }
 
-    if (requestingUserId && role && role !== 'admin') {
-      const isSeekerParticipant = channel.seeker_id === requestingUserId || requestingUserId === '00000000-0000-0000-0000-000000000001' || requestingUserId === 'usr-seeker-01';
-      const isMentorParticipant = channel.mentor_id === requestingUserId || requestingUserId === '00000000-0000-0000-0000-000000000002' || requestingUserId === 'evelyn-vasquez' || requestingUserId === 'usr-mentor-01';
-      if (!isSeekerParticipant && !isMentorParticipant) {
+    try {
+      // Try to find by conversation ID first, then by booking ID
+      let query = supabase
+        .from('conversations')
+        .select(`
+          id,
+          booking_id,
+          seeker_id,
+          mentor_id,
+          last_message_at,
+          created_at,
+          seeker:profiles!conversations_seeker_id_fkey(id, full_name, avatar_url),
+          mentor:mentors!conversations_mentor_id_fkey(
+            id,
+            headline,
+            profile:profiles!mentors_id_fkey(id, full_name, avatar_url)
+          ),
+          messages:messages(id, content, created_at, sender_id)
+        `)
+        .or(`id.eq.${conversationIdOrBookingId},booking_id.eq.${conversationIdOrBookingId}`)
+        .single();
+
+      const { data, error } = await query;
+
+      if (error || !data) {
+        console.error('Error fetching channel:', error);
         return null;
       }
+
+      // Check participant authorization
+      if (requestingUserId && role && role !== 'admin') {
+        const isParticipant = data.seeker_id === requestingUserId || data.mentor_id === requestingUserId;
+        if (!isParticipant) {
+          return null;
+        }
+      }
+
+      const lastMessage = data.messages?.length > 0
+        ? data.messages[data.messages.length - 1]
+        : null;
+
+      const mentorProfile = data.mentor?.profile || {};
+      const seekerProfile = data.seeker || {};
+
+      return {
+        id: data.id,
+        booking_id: data.booking_id,
+        mentor_id: data.mentor_id,
+        mentor_name: mentorProfile.full_name || 'Advisor',
+        mentor_avatar: mentorProfile.avatar_url,
+        mentor_headline: data.mentor?.headline,
+        seeker_id: data.seeker_id,
+        seeker_name: seekerProfile.full_name || 'Seeker',
+        seeker_avatar: seekerProfile.avatar_url,
+        last_message: lastMessage?.content,
+        last_message_at: lastMessage?.created_at || data.last_message_at,
+        unread_count: 0,
+        created_at: data.created_at,
+      };
+    } catch (err) {
+      console.error('Error in getChannelById:', err);
+      return null;
     }
-    return channel;
   }
 
   /**
-   * Get messages for a channel
+   * Get messages for a conversation
    */
-  static async getMessages(channelId: string): Promise<ChatMessage[]> {
-    const all = this.getStoredMessages();
-    return all[channelId] || [];
+  static async getMessages(conversationId: string): Promise<ChatMessage[]> {
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Returning empty messages.');
+      return [];
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          id,
+          conversation_id,
+          sender_id,
+          content,
+          attachments,
+          created_at,
+          sender:profiles(id, full_name, avatar_url)
+        `)
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching messages:', error);
+        return [];
+      }
+
+      return (data || []).map((msg: any) => ({
+        id: msg.id,
+        conversation_id: msg.conversation_id,
+        sender_id: msg.sender_id,
+        sender_name: msg.sender?.full_name,
+        sender_avatar: msg.sender?.avatar_url,
+        content: msg.content,
+        attachments: msg.attachments || [],
+        created_at: msg.created_at,
+      }));
+    } catch (err) {
+      console.error('Error in getMessages:', err);
+      return [];
+    }
   }
 
   /**
    * Send a message
    */
   static async sendMessage(params: {
-    channelId: string;
+    conversationId: string;
     senderId: string;
-    senderName: string;
-    senderRole: 'seeker' | 'mentor';
+    senderName?: string;
+    senderRole?: 'seeker' | 'mentor';
     senderAvatar?: string;
     content: string;
     attachments?: { name: string; url: string; size?: string }[];
-  }): Promise<ChatMessage> {
-    const allChannels = this.getStoredChannels();
-    const allMessages = this.getStoredMessages();
-
-    const newMessage: ChatMessage = {
-      id: `msg-${Date.now().toString().slice(-6)}`,
-      channel_id: params.channelId,
-      sender_id: params.senderId,
-      sender_name: params.senderName,
-      sender_role: params.senderRole,
-      sender_avatar: params.senderAvatar,
-      content: params.content,
-      created_at: new Date().toISOString(),
-      attachments: params.attachments,
-    };
-
-    if (!allMessages[params.channelId]) {
-      allMessages[params.channelId] = [];
+  }): Promise<ChatMessage | null> {
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Cannot send message.');
+      return null;
     }
-    allMessages[params.channelId].push(newMessage);
-    this.saveMessages(allMessages);
 
-    // Update channel snippet
-    const chIndex = allChannels.findIndex((c) => c.id === params.channelId);
-    if (chIndex !== -1) {
-      allChannels[chIndex] = {
-        ...allChannels[chIndex],
-        last_message: params.content,
-        last_message_at: newMessage.created_at,
+    try {
+      // Insert the message
+      const { data: messageData, error: messageError } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: params.conversationId,
+          sender_id: params.senderId,
+          content: params.content,
+          attachments: params.attachments ? JSON.stringify(params.attachments) : '[]',
+        })
+        .select(`
+          id,
+          conversation_id,
+          sender_id,
+          content,
+          attachments,
+          created_at,
+          sender:profiles(id, full_name, avatar_url)
+        `)
+        .single();
+
+      if (messageError || !messageData) {
+        console.error('Error sending message:', messageError);
+        return null;
+      }
+
+      // Update conversation's last_message_at
+      await supabase
+        .from('conversations')
+        .update({ last_message_at: messageData.created_at })
+        .eq('id', params.conversationId);
+
+      return {
+        id: messageData.id,
+        conversation_id: messageData.conversation_id,
+        sender_id: messageData.sender_id,
+        sender_name: messageData.sender?.full_name,
+        sender_avatar: messageData.sender?.avatar_url,
+        content: messageData.content,
+        attachments: messageData.attachments || [],
+        created_at: messageData.created_at,
       };
-      this.saveChannels(allChannels);
+    } catch (err) {
+      console.error('Error in sendMessage:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Subscribe to real-time messages for a conversation
+   */
+  static subscribeToMessages(
+    conversationId: string,
+    callback: (message: ChatMessage) => void
+  ) {
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Cannot subscribe to messages.');
+      return () => {};
     }
 
-    return newMessage;
+    const subscription = supabase
+      .channel(`messages:${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const msg = payload.new as any;
+          callback({
+            id: msg.id,
+            conversation_id: msg.conversation_id,
+            sender_id: msg.sender_id,
+            content: msg.content,
+            attachments: msg.attachments || [],
+            created_at: msg.created_at,
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }
+
+  /**
+   * Get unread message count for a user
+   */
+  static async getUnreadCount(userId: string): Promise<number> {
+    if (!isSupabaseConfigured) {
+      return 0;
+    }
+
+    try {
+      // Get all conversations for this user
+      const { data: conversations, error: convError } = await supabase
+        .from('conversations')
+        .select('id')
+        .or(`seeker_id.eq.${userId},mentor_id.eq.${userId}`);
+
+      if (convError || !conversations) {
+        return 0;
+      }
+
+      const conversationIds = conversations.map(c => c.id);
+
+      // Count messages not sent by this user
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .in('conversation_id', conversationIds)
+        .neq('sender_id', userId);
+
+      if (error) {
+        return 0;
+      }
+
+      return count || 0;
+    } catch (err) {
+      console.error('Error in getUnreadCount:', err);
+      return 0;
+    }
   }
 }
