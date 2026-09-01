@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useToast } from '../../components/ui/Toast';
 import {
@@ -154,7 +154,7 @@ export const AdminOverviewPage: React.FC = () => {
             <DollarSign className="w-4 h-4 text-[#8052ff]" />
           </div>
           <div className="text-3xl font-medium text-white">
-            ₹{(kpis?.totalGrossVolumeInr || 0).toLocaleString('en-IN')}
+            â‚¹{(kpis?.totalGrossVolumeInr || 0).toLocaleString('en-IN')}
           </div>
           <p className="text-[11px] text-[#9a9a9a]">Cumulative transacted client fees</p>
         </div>
@@ -165,7 +165,7 @@ export const AdminOverviewPage: React.FC = () => {
             <TrendingUp className="w-4 h-4 text-[#15846e]" />
           </div>
           <div className="text-3xl font-medium text-[#15846e]">
-            ₹{(kpis?.platformRevenueInr || 0).toLocaleString('en-IN')}
+            â‚¹{(kpis?.platformRevenueInr || 0).toLocaleString('en-IN')}
           </div>
           <p className="text-[11px] text-[#9a9a9a]">Net Suggest Key commissions</p>
         </div>
@@ -205,7 +205,7 @@ export const AdminOverviewPage: React.FC = () => {
             to="/admin/verification"
             className="text-xs uppercase tracking-wider text-[#8052ff] hover:underline"
           >
-            View All ({verificationQueue.length}) →
+            View All ({verificationQueue.length}) â†’
           </Link>
         </div>
 
@@ -225,7 +225,7 @@ export const AdminOverviewPage: React.FC = () => {
                     <span className="text-xs text-[#9a9a9a]">Board: {req.licensing_board}</span>
                   </div>
                   <div className="text-xs text-[#bdbdbd]">
-                    License #{req.license_number} • Submitted{' '}
+                    License #{req.license_number} â€¢ Submitted{' '}
                     {new Date(req.submitted_at).toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
@@ -254,7 +254,7 @@ export const AdminOverviewPage: React.FC = () => {
           </div>
         ) : (
           <div className="p-8 rounded-2xl border border-dashed border-white/10 text-center text-xs text-[#9a9a9a]">
-            ✓ All specialist credential applications are up to date. Zero pending audits.
+            âœ“ All specialist credential applications are up to date. Zero pending audits.
           </div>
         )}
       </div>
@@ -327,7 +327,7 @@ export const AdminOverviewPage: React.FC = () => {
                   target="_blank"
                   className="text-[#8052ff] hover:underline"
                 >
-                  Seeker View ↗
+                  Seeker View â†—
                 </Link>
               </div>
             </div>
@@ -345,7 +345,7 @@ export const AdminOverviewPage: React.FC = () => {
               <span>Recent Atomic Bookings</span>
             </h3>
             <Link to="/admin/bookings" className="text-xs uppercase tracking-wider text-[#8052ff] hover:underline">
-              Ledger →
+              Ledger â†’
             </Link>
           </div>
 
@@ -358,11 +358,11 @@ export const AdminOverviewPage: React.FC = () => {
                 <div>
                   <div className="text-white font-medium">{b.gig.title}</div>
                   <div className="text-[#9a9a9a] text-[11px]">
-                    Advisor: {b.mentor.full_name} • Seeker: {b.seeker_name}
+                    Advisor: {b.mentor.full_name} â€¢ Seeker: {b.seeker_name}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-white font-semibold">₹{(b.amount_inr || 0).toLocaleString()}</div>
+                  <div className="text-white font-semibold">â‚¹{(b.amount_inr || 0).toLocaleString()}</div>
                   <span
                     className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${
                       b.status === 'confirmed'
@@ -388,7 +388,7 @@ export const AdminOverviewPage: React.FC = () => {
               <span>Escrow Disputes & Reports</span>
             </h3>
             <Link to="/admin/reports" className="text-xs uppercase tracking-wider text-[#8052ff] hover:underline">
-              All Reports →
+              All Reports â†’
             </Link>
           </div>
 
@@ -400,8 +400,8 @@ export const AdminOverviewPage: React.FC = () => {
                   className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/5 space-y-2 text-xs"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-rose-300">Ticket #{d.id} • {d.issue_category}</span>
-                    <span className="text-white font-medium">₹{(d.amount_inr || 0).toLocaleString()}</span>
+                    <span className="font-semibold text-rose-300">Ticket #{d.id} â€¢ {d.issue_category}</span>
+                    <span className="text-white font-medium">â‚¹{(d.amount_inr || 0).toLocaleString()}</span>
                   </div>
                   <p className="text-[#bdbdbd] line-clamp-2">{d.statement}</p>
                   <div className="flex justify-end pt-1">
@@ -409,7 +409,7 @@ export const AdminOverviewPage: React.FC = () => {
                       to="/admin/reports"
                       className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white text-[11px] uppercase font-semibold"
                     >
-                      Arbitrate Case →
+                      Arbitrate Case â†’
                     </Link>
                   </div>
                 </div>
@@ -417,7 +417,7 @@ export const AdminOverviewPage: React.FC = () => {
             </div>
           ) : (
             <div className="p-8 rounded-2xl border border-dashed border-white/10 text-center text-xs text-[#9a9a9a]">
-              ✓ No open escrow disputes or client conduct reports.
+              âœ“ No open escrow disputes or client conduct reports.
             </div>
           )}
         </div>
@@ -567,8 +567,8 @@ export const AdminUsersPage: React.FC = () => {
                   </td>
                   <td className="p-4 text-[#bdbdbd]">
                     {user.total_bookings} Bookings
-                    {user.total_spend_inr ? ` • ₹${(user.total_spend_inr || 0).toLocaleString()} Spent` : ''}
-                    {user.total_earned_inr ? ` • ₹${(user.total_earned_inr || 0).toLocaleString()} Earned` : ''}
+                    {user.total_spend_inr ? ` â€¢ â‚¹${(user.total_spend_inr || 0).toLocaleString()} Spent` : ''}
+                    {user.total_earned_inr ? ` â€¢ â‚¹${(user.total_earned_inr || 0).toLocaleString()} Earned` : ''}
                   </td>
                   <td className="p-4">
                     <span
@@ -746,12 +746,12 @@ export const AdminMentorsPage: React.FC = () => {
                     Assigned Advisory Domain:
                   </label>
                   <select
-                    value={mentor.segment_id || mentor.verified_categories?.[0] || 'relationship'}
+                    value={mentor.segment_id || mentor.verified_categories?.[0] || segments[0]?.id || ''}
                     onChange={(e) => handleUpdateSegment(mentor.id, e.target.value)}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#8052ff]"
                   >
                     {segments.map((seg) => (
-                      <option key={seg.id} value={seg.slug || seg.id}>
+                      <option key={seg.id} value={seg.id}>
                         {seg.name} {seg.is_active ? '' : '(Archived)'}
                       </option>
                     ))}
@@ -762,7 +762,7 @@ export const AdminMentorsPage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3 text-xs bg-white/[0.01] p-3 rounded-xl border border-white/5">
                   <div>
                     <span className="text-[10px] uppercase text-[#9a9a9a] block">Gross Earned</span>
-                    <span className="font-semibold text-white">₹{(mentor.total_revenue_inr || 0).toLocaleString()}</span>
+                    <span className="font-semibold text-white">â‚¹{(mentor.total_revenue_inr || 0).toLocaleString()}</span>
                   </div>
                   <div>
                     <span className="text-[10px] uppercase text-[#9a9a9a] block">Completed Calls</span>
@@ -827,7 +827,7 @@ export const AdminMentorsPage: React.FC = () => {
                   target="_blank"
                   className="px-3 py-1.5 rounded-full border border-white/10 hover:bg-white/5 text-xs text-[#bdbdbd] hover:text-white"
                 >
-                  Public Profile ↗
+                  Public Profile â†—
                 </Link>
               </div>
             </div>
@@ -995,7 +995,7 @@ export const AdminBookingsPage: React.FC = () => {
     );
     toast({
       title: 'Escrow Released',
-      description: `Disbursement of ₹${(booking.mentor_payout_inr || 0).toLocaleString()} issued to mentor.`,
+      description: `Disbursement of â‚¹${(booking.mentor_payout_inr || 0).toLocaleString()} issued to mentor.`,
     });
   };
 
@@ -1013,7 +1013,7 @@ export const AdminBookingsPage: React.FC = () => {
     );
     toast({
       title: 'Refund Processed',
-      description: `Full refund of ₹${(booking.amount_inr || 0).toLocaleString()} returned to seeker wallet.`,
+      description: `Full refund of â‚¹${(booking.amount_inr || 0).toLocaleString()} returned to seeker wallet.`,
     });
   };
 
@@ -1056,9 +1056,9 @@ export const AdminBookingsPage: React.FC = () => {
                       month: 'short',
                       day: 'numeric',
                     })}{' '}
-                    • {new Date(booking.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    â€¢ {new Date(booking.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </td>
-                  <td className="p-4 font-semibold text-white">₹{(booking.amount_inr || 0).toLocaleString()}</td>
+                  <td className="p-4 font-semibold text-white">â‚¹{(booking.amount_inr || 0).toLocaleString()}</td>
                   <td className="p-4">
                     <span
                       className={`uppercase text-[10px] font-semibold px-2.5 py-0.5 rounded-full border ${
@@ -1202,7 +1202,7 @@ export const AdminReportsPage: React.FC = () => {
                       {d.status}
                     </span>
                   </div>
-                  <span className="text-sm font-bold text-white">₹{(d.amount_inr || 0).toLocaleString()} Escrow</span>
+                  <span className="text-sm font-bold text-white">â‚¹{(d.amount_inr || 0).toLocaleString()} Escrow</span>
                 </div>
 
                 <p className="text-xs text-[#bdbdbd] bg-black/40 p-3 rounded-xl border border-white/5">
@@ -1211,7 +1211,7 @@ export const AdminReportsPage: React.FC = () => {
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#9a9a9a] pt-1">
                   <div>
-                    Seeker: {d.seeker_name} • Advisor: {d.mentor_name} • Booking: {d.booking_id}
+                    Seeker: {d.seeker_name} â€¢ Advisor: {d.mentor_name} â€¢ Booking: {d.booking_id}
                   </div>
 
                   {d.status !== 'resolved' ? (
@@ -1318,8 +1318,8 @@ export const AdminReportsPage: React.FC = () => {
                       {tx.type}
                     </span>
                   </td>
-                  <td className="p-3 text-white">₹{(tx.amount_inr || 0).toLocaleString()}</td>
-                  <td className="p-3 text-[#9a9a9a]">{tx.booking_id || '—'}</td>
+                  <td className="p-3 text-white">â‚¹{(tx.amount_inr || 0).toLocaleString()}</td>
+                  <td className="p-3 text-[#9a9a9a]">{tx.booking_id || 'â€”'}</td>
                   <td className="p-3 pr-6 text-[#9a9a9a] text-[11px]">{new Date(tx.created_at).toLocaleString()}</td>
                 </tr>
               ))}
@@ -1420,7 +1420,7 @@ export const AdminSettingsPage: React.FC = () => {
               <div className="space-y-0.5">
                 <div className="text-xs font-medium text-white">Mental Health Professional Verification</div>
                 <div className="text-[11px] text-[#9a9a9a]">
-                  Blocks all bookings for mental-health offerings if mentor verification status is not Approved.
+                   Blocks all bookings for credential-verified specialty offerings if mentor verification status is not Approved.
                 </div>
               </div>
               <input
@@ -1490,675 +1490,3 @@ export const AdminSettingsPage: React.FC = () => {
     </div>
   );
 };
-
-/* ==========================================================================
-   8. ADMIN ADVISORY SEGMENTS MANAGEMENT (DATABASE SOURCE OF TRUTH)
-   ========================================================================== */
-export const AdminSegmentsPage: React.FC = () => {
-  const { toast } = useToast();
-  const [segments, setSegments] = useState<any[]>([]);
-  const [analytics, setAnalytics] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Modal / Form state
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingSegment, setEditingSegment] = useState<any | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  // Form Fields
-  const [formName, setFormName] = useState('');
-  const [formSlug, setFormSlug] = useState('');
-  const [formShortDesc, setFormShortDesc] = useState('');
-  const [formFullDesc, setFormFullDesc] = useState('');
-  const [formIcon, setFormIcon] = useState('Sparkles');
-  const [formAccent, setFormAccent] = useState('#8052ff');
-  const [formUseCases, setFormUseCases] = useState('');
-  const [formAudience, setFormAudience] = useState('Seekers & Professionals');
-  const [formAdvisorTypes, setFormAdvisorTypes] = useState('Audited Specialists');
-  const [formIsActive, setFormIsActive] = useState(true);
-  const [formOrder, setFormOrder] = useState(1);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const { SegmentService } = await import('../../domains/segment/SegmentService');
-      const [allSegs, metrics] = await Promise.all([
-        SegmentService.getAllSegments(true),
-        AdminService.getSegmentAnalytics(),
-      ]);
-      setSegments(allSegs);
-      setAnalytics(metrics);
-    } catch (err) {
-      console.error('Failed to load segments', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const openCreateModal = () => {
-    setEditingSegment(null);
-    setFormName('');
-    setFormSlug('');
-    setFormShortDesc('');
-    setFormFullDesc('');
-    setFormIcon('Sparkles');
-    setFormAccent('#8052ff');
-    setFormUseCases('Strategy & roadmaps\nCritical inflection points\n1:1 Structured guidance');
-    setFormAudience('Seekers & Professionals');
-    setFormAdvisorTypes('Audited Domain Specialists');
-    setFormIsActive(true);
-    setFormOrder(segments.length + 1);
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (seg: any) => {
-    setEditingSegment(seg);
-    setFormName(seg.name || '');
-    setFormSlug(seg.slug || '');
-    setFormShortDesc(seg.short_description || seg.description || '');
-    setFormFullDesc(seg.description || '');
-    setFormIcon(seg.icon || 'Sparkles');
-    setFormAccent(seg.accent || '#8052ff');
-    const cases = Array.isArray(seg.use_cases) ? seg.use_cases.join('\n') : (seg.use_cases || '');
-    setFormUseCases(cases);
-    setFormAudience(seg.audience || 'Seekers & Professionals');
-    setFormAdvisorTypes(seg.advisor_types || 'Audited Specialists');
-    setFormIsActive(seg.is_active !== undefined ? seg.is_active : true);
-    setFormOrder(seg.display_order || 1);
-    setIsModalOpen(true);
-  };
-
-  const handleNameChange = (val: string) => {
-    setFormName(val);
-    if (!editingSegment) {
-      const generatedSlug = val
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      setFormSlug(generatedSlug);
-    }
-  };
-
-  const handleSaveSegment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formName.trim() || !formSlug.trim()) {
-      toast({
-        title: 'Validation Error',
-        description: 'Name and slug are required fields.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const { SegmentService } = await import('../../domains/segment/SegmentService');
-      const useCasesArray = formUseCases
-        .split('\n')
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      if (editingSegment) {
-        // Update existing segment
-        await SegmentService.updateSegment(editingSegment.id || editingSegment.slug, {
-          name: formName.trim(),
-          slug: formSlug.trim(),
-          short_description: formShortDesc.trim(),
-          description: formFullDesc.trim() || formShortDesc.trim(),
-          icon: formIcon,
-          accent: formAccent,
-          use_cases: useCasesArray,
-          audience: formAudience.trim(),
-          advisor_types: formAdvisorTypes.trim(),
-          is_active: formIsActive,
-          display_order: Number(formOrder),
-        });
-        toast({
-          title: 'Segment Updated',
-          description: `Segment "${formName}" updated successfully in database.`,
-        });
-      } else {
-        // Create new segment
-        await SegmentService.createSegment({
-          name: formName.trim(),
-          slug: formSlug.trim(),
-          short_description: formShortDesc.trim(),
-          description: formFullDesc.trim() || formShortDesc.trim(),
-          icon: formIcon,
-          accent: formAccent,
-          use_cases: useCasesArray,
-          audience: formAudience.trim(),
-          advisor_types: formAdvisorTypes.trim(),
-          is_active: formIsActive,
-          display_order: Number(formOrder),
-        });
-        toast({
-          title: 'Segment Created',
-          description: `New segment "${formName}" created and live in database.`,
-        });
-      }
-
-      setIsModalOpen(false);
-      await loadData();
-    } catch (err: any) {
-      toast({
-        title: 'Save Failed',
-        description: err?.message || 'Failed to save advisory segment',
-        variant: 'destructive',
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleToggleActive = async (seg: any) => {
-    try {
-      const { SegmentService } = await import('../../domains/segment/SegmentService');
-      const updated = await SegmentService.toggleSegmentActive(seg.id || seg.slug);
-      if (updated) {
-        toast({
-          title: 'Status Updated',
-          description: `Segment ${seg.name} is now ${updated.is_active ? 'Active' : 'Inactive'}`,
-        });
-        await loadData();
-      }
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: 'Failed to toggle segment state',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleMoveOrder = async (index: number, direction: 'up' | 'down') => {
-    const targetIdx = direction === 'up' ? index - 1 : index + 1;
-    if (targetIdx < 0 || targetIdx >= segments.length) return;
-
-    const newOrder = [...segments];
-    const temp = newOrder[index];
-    newOrder[index] = newOrder[targetIdx];
-    newOrder[targetIdx] = temp;
-
-    const orderedIds = newOrder.map((s) => s.id);
-    const { SegmentService } = await import('../../domains/segment/SegmentService');
-    await SegmentService.reorderSegments(orderedIds);
-    await loadData();
-    toast({
-      title: 'Order Updated',
-      description: 'Display sequence updated',
-    });
-  };
-
-  const handleDeleteSegment = async (seg: any) => {
-    if (!confirm(`Are you sure you want to delete segment "${seg.name}"? If mentors exist, it will prevent deletion.`)) {
-      return;
-    }
-
-    try {
-      const { SegmentService } = await import('../../domains/segment/SegmentService');
-      const res = await SegmentService.deleteSegment(seg.id || seg.slug);
-      if (res.success) {
-        toast({
-          title: 'Segment Deleted',
-          description: `Segment "${seg.name}" deleted.`,
-        });
-        await loadData();
-      } else {
-        toast({
-          title: 'Cannot Delete',
-          description: res.error || 'Cannot delete segment.',
-          variant: 'destructive',
-        });
-      }
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: 'Delete failed',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const totalSegments = segments.length;
-  const activeSegments = segments.filter((s) => s.is_active).length;
-  const totalAdvisors = analytics.reduce((acc, curr) => acc + (curr.advisor_count || 0), 0);
-  const totalGmv = analytics.reduce((acc, curr) => acc + (curr.total_gmv_inr || 0), 0);
-
-  const PRESET_ICONS = [
-    'Heart', 'Briefcase', 'Brain', 'Sparkles', 'Coins', 'Compass',
-    'Scale', 'GraduationCap', 'Activity', 'Shield', 'Users', 'TrendingUp',
-    'Building', 'Award', 'Lightbulb', 'Stethoscope'
-  ];
-
-  const PRESET_ACCENTS = [
-    '#ffb829', '#8052ff', '#15846e', '#3b82f6', '#ec4899', '#f97316', '#06b6d4', '#10b981'
-  ];
-
-  return (
-    <div className="space-y-8">
-      {/* Header & Create Button */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/5">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase font-semibold tracking-widest text-[#8052ff] px-2 py-0.5 rounded-full bg-[#8052ff]/10 border border-[#8052ff]/20">
-              Database Source of Truth
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-normal text-white tracking-tight">
-            Advisory Segments Manager
-          </h1>
-          <p className="text-xs text-[#9a9a9a]">
-            Create, configure, reorder, and govern platform advisory pillars. Changes reflect instantly across seeker switchers, introductions, and carousels.
-          </p>
-        </div>
-
-        <button
-          onClick={openCreateModal}
-          className="px-5 py-2.5 rounded-full bg-[#8052ff] hover:bg-[#6c3df0] text-white text-xs font-semibold uppercase tracking-wider flex items-center gap-2 transition-all shadow-md shadow-[#8052ff]/20 shrink-0"
-        >
-          <Layers className="w-4 h-4" />
-          <span>Add Advisory Domain</span>
-        </button>
-      </div>
-
-      {/* KPI Overview Strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl border border-white/10 bg-white/[0.02] space-y-1">
-          <span className="text-[10px] uppercase tracking-wider text-[#9a9a9a]">Total Domains</span>
-          <p className="text-xl font-medium text-white">{totalSegments}</p>
-        </div>
-        <div className="p-4 rounded-2xl border border-white/10 bg-white/[0.02] space-y-1">
-          <span className="text-[10px] uppercase tracking-wider text-[#15846e]">Active In Discovery</span>
-          <p className="text-xl font-medium text-[#15846e]">{activeSegments}</p>
-        </div>
-        <div className="p-4 rounded-2xl border border-white/10 bg-white/[0.02] space-y-1">
-          <span className="text-[10px] uppercase tracking-wider text-[#9a9a9a]">Audited Mentors</span>
-          <p className="text-xl font-medium text-white">{totalAdvisors}</p>
-        </div>
-        <div className="p-4 rounded-2xl border border-white/10 bg-white/[0.02] space-y-1">
-          <span className="text-[10px] uppercase tracking-wider text-[#ffb829]">Aggregated GMV</span>
-          <p className="text-xl font-medium text-[#ffb829]">₹{totalGmv.toLocaleString('en-IN')}</p>
-        </div>
-      </div>
-
-      {/* Segments Live Table & Ordering */}
-      <div className="rounded-[24px] border border-white/10 bg-white/[0.015] overflow-hidden">
-        <div className="p-5 border-b border-white/5 flex items-center justify-between">
-          <h2 className="text-sm font-medium text-white uppercase tracking-wider">
-            Active & Seeded Domains ({segments.length})
-          </h2>
-          <span className="text-xs text-[#707070]">
-            Sequence governs Seeker horizontal tab ordering
-          </span>
-        </div>
-
-        {loading ? (
-          <div className="py-16 text-center text-xs text-[#9a9a9a]">
-            Loading advisory segments from database...
-          </div>
-        ) : segments.length === 0 ? (
-          <div className="py-16 text-center space-y-2">
-            <p className="text-sm text-[#bdbdbd]">No advisory segments defined in database.</p>
-            <button
-              onClick={openCreateModal}
-              className="text-xs text-[#8052ff] hover:underline uppercase tracking-wider"
-            >
-              + Create your first domain
-            </button>
-          </div>
-        ) : (
-          <div className="divide-y divide-white/5">
-            {segments.map((seg, idx) => {
-              const segAnalytics = analytics.find(
-                (a) => a.segment.id === seg.id || a.segment.slug === seg.slug
-              );
-              const accent = seg.accent || '#8052ff';
-
-              return (
-                <div
-                  key={seg.id || seg.slug}
-                  className={`p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors ${
-                    seg.is_active ? 'hover:bg-white/[0.02]' : 'opacity-60 bg-white/[0.005]'
-                  }`}
-                >
-                  {/* Left: Reorder controls + Icon & Identity */}
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="flex flex-col items-center gap-1">
-                      <button
-                        onClick={() => handleMoveOrder(idx, 'up')}
-                        disabled={idx === 0}
-                        title="Move Up"
-                        className="w-6 h-6 rounded border border-white/10 flex items-center justify-center text-xs text-[#9a9a9a] hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed"
-                      >
-                        ▲
-                      </button>
-                      <span className="text-[10px] font-mono text-[#707070]">{idx + 1}</span>
-                      <button
-                        onClick={() => handleMoveOrder(idx, 'down')}
-                        disabled={idx === segments.length - 1}
-                        title="Move Down"
-                        className="w-6 h-6 rounded border border-white/10 flex items-center justify-center text-xs text-[#9a9a9a] hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed"
-                      >
-                        ▼
-                      </button>
-                    </div>
-
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-white/10"
-                      style={{
-                        backgroundColor: `${accent}15`,
-                        color: accent,
-                      }}
-                    >
-                      <Layers className="w-5 h-5" />
-                    </div>
-
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-white">{seg.name}</span>
-                        <span className="text-[10px] font-mono text-[#707070]">/{seg.slug}</span>
-                        <span
-                          className="text-[9px] uppercase font-semibold px-2 py-0.2 rounded-full border"
-                          style={{
-                            borderColor: `${accent}40`,
-                            color: accent,
-                            backgroundColor: `${accent}10`,
-                          }}
-                        >
-                          {seg.advisor_types || 'Audited'}
-                        </span>
-                        {seg.is_active ? (
-                          <span className="text-[9px] uppercase px-1.5 py-0.2 rounded bg-[#15846e]/20 text-[#15846e] border border-[#15846e]/30">
-                            Live
-                          </span>
-                        ) : (
-                          <span className="text-[9px] uppercase px-1.5 py-0.2 rounded bg-red-500/10 text-red-400 border border-red-500/20">
-                            Inactive
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-[#9a9a9a] line-clamp-1 max-w-xl">
-                        {seg.short_description || seg.description}
-                      </p>
-                      <div className="flex items-center gap-3 text-[11px] text-[#707070]">
-                        <span>Audience: <strong className="text-[#bdbdbd]">{seg.audience}</strong></span>
-                        <span>•</span>
-                        <span>Use Cases: <strong className="text-[#bdbdbd]">{(seg.use_cases || []).length}</strong></span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right: Metrics & Action Buttons */}
-                  <div className="flex items-center gap-4 justify-between md:justify-end shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/5">
-                    <div className="text-right hidden sm:block pr-2">
-                      <p className="text-xs font-semibold text-white">
-                        {segAnalytics?.advisor_count || 0} Advisors
-                      </p>
-                      <p className="text-[11px] text-[#707070]">
-                        ₹{(segAnalytics?.total_gmv_inr || 0).toLocaleString('en-IN')} GMV
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleToggleActive(seg)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium uppercase tracking-wider transition-colors border ${
-                          seg.is_active
-                            ? 'border-red-500/30 text-red-400 hover:bg-red-500/10'
-                            : 'border-[#15846e]/40 text-[#15846e] hover:bg-[#15846e]/10'
-                        }`}
-                      >
-                        {seg.is_active ? 'Deactivate' : 'Activate'}
-                      </button>
-
-                      <button
-                        onClick={() => openEditModal(seg)}
-                        className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-colors"
-                        title="Edit Segment"
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
-
-                      <button
-                        onClick={() => handleDeleteSegment(seg)}
-                        className="p-2 rounded-xl bg-red-500/5 hover:bg-red-500/15 text-red-400 border border-red-500/15 transition-colors"
-                        title="Delete Segment"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* CREATE / EDIT MODAL */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-          <div className="relative w-full max-w-2xl bg-[#0d0d10] border border-white/15 rounded-[28px] p-6 sm:p-8 space-y-6 shadow-2xl my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-white/10">
-              <div className="space-y-0.5">
-                <h3 className="text-lg font-normal text-white">
-                  {editingSegment ? `Edit Segment: ${editingSegment.name}` : 'Create New Advisory Domain'}
-                </h3>
-                <p className="text-xs text-[#8e8e93]">
-                  Configure schema fields, educational introductions, and visual accents.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-2 rounded-full text-[#9a9a9a] hover:text-white hover:bg-white/10 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveSegment} className="space-y-5">
-              {/* Row 1: Name + Slug */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Segment Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formName}
-                    onChange={(e) => handleNameChange(e.target.value)}
-                    placeholder="e.g. Financial & Wealth"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-[#666] focus:outline-none focus:border-[#8052ff]"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    URL Slug * (Unique)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formSlug}
-                    onChange={(e) => setFormSlug(e.target.value)}
-                    placeholder="e.g. financial-wealth"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white font-mono placeholder-[#666] focus:outline-none focus:border-[#8052ff]"
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Short Description / Tagline */}
-              <div className="space-y-1.5">
-                <label className="text-xs uppercase tracking-wider text-[#9a9a9a] font-medium">
-                  Short Description / Overview *
-                </label>
-                <textarea
-                  required
-                  rows={2}
-                  value={formShortDesc}
-                  onChange={(e) => setFormShortDesc(e.target.value)}
-                  placeholder="Explains what this advisory domain covers in 1-2 crisp sentences..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-[#666] focus:outline-none focus:border-[#8052ff]"
-                />
-              </div>
-
-              {/* Row 3: Full Educational Description */}
-              <div className="space-y-1.5">
-                <label className="text-xs uppercase tracking-wider text-[#9a9a9a] font-medium">
-                  Detailed Domain Context & Mission
-                </label>
-                <textarea
-                  rows={2}
-                  value={formFullDesc}
-                  onChange={(e) => setFormFullDesc(e.target.value)}
-                  placeholder="Detailed explanation of advisor qualifications, methodologies, and focus..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-[#666] focus:outline-none focus:border-[#8052ff]"
-                />
-              </div>
-
-              {/* Row 4: Icon & Accent Picker */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Domain Icon
-                  </label>
-                  <select
-                    value={formIcon}
-                    onChange={(e) => setFormIcon(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#8052ff]"
-                  >
-                    {PRESET_ICONS.map((ic) => (
-                      <option key={ic} value={ic} className="bg-[#1a1a20]">
-                        {ic}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Accent Color
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={formAccent}
-                      onChange={(e) => setFormAccent(e.target.value)}
-                      className="w-10 h-9 rounded-lg border border-white/10 bg-transparent cursor-pointer p-0.5"
-                    />
-                    <div className="flex items-center gap-1 overflow-x-auto py-1">
-                      {PRESET_ACCENTS.map((hex) => (
-                        <button
-                          key={hex}
-                          type="button"
-                          onClick={() => setFormAccent(hex)}
-                          className="w-6 h-6 rounded-full border border-white/20 shrink-0 transition-transform hover:scale-110"
-                          style={{ backgroundColor: hex }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 5: Use Cases / Topics (One per line) */}
-              <div className="space-y-1.5">
-                <label className="text-xs uppercase tracking-wider text-[#9a9a9a] font-medium flex items-center justify-between">
-                  <span>What this domain helps with (One per line)</span>
-                  <span className="text-[10px] text-[#707070]">Renders as educational bullet points</span>
-                </label>
-                <textarea
-                  rows={3}
-                  value={formUseCases}
-                  onChange={(e) => setFormUseCases(e.target.value)}
-                  placeholder="e.g.&#10;Recurring bottlenecks & crisis resolution&#10;Strategic decision-making & leverage&#10;Promotion dossiers & compensation"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white font-mono placeholder-[#666] focus:outline-none focus:border-[#8052ff]"
-                />
-              </div>
-
-              {/* Row 6: Target Audience & Advisor Badge */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Target Audience
-                  </label>
-                  <input
-                    type="text"
-                    value={formAudience}
-                    onChange={(e) => setFormAudience(e.target.value)}
-                    placeholder="e.g. Founders • Executives • Couples"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#8052ff]"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Advisor Credentials Badge
-                  </label>
-                  <input
-                    type="text"
-                    value={formAdvisorTypes}
-                    onChange={(e) => setFormAdvisorTypes(e.target.value)}
-                    placeholder="e.g. LMFT & Gottman Audited"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#8052ff]"
-                  />
-                </div>
-              </div>
-
-              {/* Row 7: Active Toggle & Display Order */}
-              <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                <label className="flex items-center gap-2 text-xs text-white cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formIsActive}
-                    onChange={(e) => setFormIsActive(e.target.checked)}
-                    className="rounded bg-white/10 border-white/20 text-[#8052ff]"
-                  />
-                  <span>Active & Visible to Seekers</span>
-                </label>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-[#9a9a9a]">Display Sequence:</span>
-                  <input
-                    type="number"
-                    min="1"
-                    value={formOrder}
-                    onChange={(e) => setFormOrder(Number(e.target.value))}
-                    className="w-16 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white text-center"
-                  />
-                </div>
-              </div>
-
-              {/* Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 rounded-full border border-white/10 hover:bg-white/5 text-xs uppercase tracking-wider text-[#9a9a9a] hover:text-white transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-6 py-2.5 rounded-full bg-[#8052ff] hover:bg-[#6c3df0] text-white text-xs font-semibold uppercase tracking-wider transition-all shadow-md shadow-[#8052ff]/20 flex items-center gap-2"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{saving ? 'Saving...' : editingSegment ? 'Save Changes' : 'Create Segment'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-

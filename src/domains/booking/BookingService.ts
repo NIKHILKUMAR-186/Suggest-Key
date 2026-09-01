@@ -1,6 +1,7 @@
 import { Booking, BookingStatus, Gig, Profile, Mentor } from '../../lib/supabase/types';
 import { SEED_ADVISORS, AdvisorDetail } from '../advisor/seedData';
 import { AvailabilityService } from './AvailabilityService';
+import { SegmentService } from '../segment/SegmentService';
 
 export interface EnrichedBooking extends Booking {
   gig: Gig;
@@ -205,8 +206,9 @@ export class BookingService {
     const mentor = SEED_ADVISORS.find((a) => a.id === params.mentorId) || SEED_ADVISORS[0];
     const gig = mentor.gigs.find((g) => g.id === params.gigId) || mentor.gigs[0];
 
-    // 2. Mental health verification constraint: if category requires verification, mentor must be approved
-    if (gig.category_id === 'mental-health' && mentor.verification_status !== 'approved') {
+    // 2. Verification constraint: if the gig's segment requires credential verification, mentor must be approved
+    const seg = SegmentService.getCachedSegmentBySlug(gig.segment_id);
+    if (seg?.requiresCredentialVerification && mentor.verification_status !== 'approved') {
       return {
         success: false,
         error: 'MENTOR_NOT_VERIFIED',

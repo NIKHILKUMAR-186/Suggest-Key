@@ -94,7 +94,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'executive-crossroads',
         mentor_id: 'evelyn-vasquez',
-        category_id: 'mental-health',
+        segment_id: 'mental-health',
         title: 'Executive Crossroads & Burnout Diagnostics',
         slug: 'executive-crossroads-burnout-diagnostics',
         description: 'A 45-minute structured clinical advisory session designed to pinpoint the physiological and cognitive root causes of executive burnout, evaluate active decision fatigue, and construct an actionable 30-day psychological recovery protocol.',
@@ -112,7 +112,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'cognitive-resilience-protocol',
         mentor_id: 'evelyn-vasquez',
-        category_id: 'mental-health',
+        segment_id: 'mental-health',
         title: 'High-Cognitive-Load Stress Modulation Protocol',
         slug: 'high-cognitive-load-stress-modulation',
         description: 'Targeted psychological calibration before high-stakes board reviews, restructuring periods, or sustained operational sprints. Protect executive cognitive stamina.',
@@ -189,7 +189,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'partnership-conflict-calibration',
         mentor_id: 'dr-alistair-chen',
-        category_id: 'relationship',
+        segment_id: 'relationship',
         title: 'High-Stakes Partnership Conflict Calibration & De-escalation',
         slug: 'partnership-conflict-calibration-de-escalation',
         description: 'A 50-minute structured relationship session using the Gottman repair protocol to de-escalate recurring gridlock, unpack underlying needs, and rebuild emotional alignment during high-stress life transitions.',
@@ -207,7 +207,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'pre-marital-alignment-strategy',
         mentor_id: 'dr-alistair-chen',
-        category_id: 'relationship',
+        segment_id: 'relationship',
         title: 'Pre-Commitment & Life Alignment Strategic Roadmap',
         slug: 'pre-commitment-life-alignment-roadmap',
         description: 'Comprehensive evaluation of core values, financial expectations, family boundaries, and communication architecture before major commitment milestones.',
@@ -282,7 +282,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'family-boundaries-dynamics',
         mentor_id: 'priya-sharma',
-        category_id: 'relationship',
+        segment_id: 'relationship',
         title: 'Interpersonal Boundaries & High-Stress Family Dynamics',
         slug: 'interpersonal-boundaries-family-dynamics',
         description: 'Establish healthy, non-reactive boundaries with extended family, in-laws, and demanding social circles while preserving mutual respect and personal peace.',
@@ -347,7 +347,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'staff-plus-career-strategy',
         mentor_id: 'marcus-thorne',
-        category_id: 'career',
+        segment_id: 'career',
         title: 'Staff+ Engineering Promotion & Organizational Influence',
         slug: 'staff-plus-engineering-promotion-influence',
         description: 'Navigate the nebulous transition from Senior Engineer to Staff/Principal. Learn how to write compelling RFCs, drive cross-org architectural alignment, and build executive sponsorship.',
@@ -364,7 +364,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'system-architecture-audit',
         mentor_id: 'marcus-thorne',
-        category_id: 'career',
+        segment_id: 'career',
         title: 'Executive Architecture Teardown & Leadership Strategy',
         slug: 'executive-architecture-teardown-leadership',
         description: 'Live architectural review and leadership strategy for high-scale distributed backend systems, database scaling, and engineering organization structure.',
@@ -430,7 +430,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'executive-compensation-negotiation',
         mentor_id: 'sarah-jenkins',
-        category_id: 'career',
+        segment_id: 'career',
         title: 'Executive Offer & Equity Package Negotiation Strategy',
         slug: 'executive-offer-equity-negotiation-strategy',
         description: 'Maximize your total compensation leverage for VP/Director/C-level offers. Audit base, bonus multipliers, RSUs/options vesting cliffs, and severance clauses.',
@@ -447,7 +447,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'career-pivot-c-suite',
         mentor_id: 'sarah-jenkins',
-        category_id: 'career',
+        segment_id: 'career',
         title: 'Strategic Career Pivot & Board Positioning Blueprint',
         slug: 'strategic-career-pivot-board-positioning',
         description: 'Position your executive track record for board seats, founder transitions, or strategic industry pivots with structured authority.',
@@ -513,7 +513,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'neuro-resilience-anxiety-protocol',
         mentor_id: 'dr-vikram-patel',
-        category_id: 'mental-health',
+        segment_id: 'mental-health',
         title: 'Executive Neuro-Resilience & Acute Anxiety Protocol',
         slug: 'executive-neuro-resilience-anxiety-protocol',
         description: 'Evidence-based cognitive neuroscience protocols to regulate sympathetic nervous system overactivation, manage imposter anxiety, and sustain peak mental performance.',
@@ -579,7 +579,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'trust-rebuild-protocol',
         mentor_id: 'dr-elena-rostova',
-        category_id: 'relationship',
+        segment_id: 'relationship',
         title: 'Post-Rupture Trust Rebuild & Relational Recovery',
         slug: 'post-rupture-trust-rebuild-recovery',
         description: 'Structured therapeutic framework to de-escalate resentment, rebuild emotional safety, and construct transparent communication agreements.',
@@ -629,7 +629,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'intercultural-marriage-roadmap',
         mentor_id: 'rahul-mehta-rel',
-        category_id: 'relationship',
+        segment_id: 'relationship',
         title: 'Intercultural Couple Alignment & Boundary Architecture',
         slug: 'intercultural-couple-alignment-roadmap',
         description: 'Navigate tradition, family expectations, and personal values without compromising personal sovereignty.',
@@ -679,7 +679,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'attachment-style-calibration',
         mentor_id: 'dr-sophia-vance',
-        category_id: 'relationship',
+        segment_id: 'relationship',
         title: 'Anxious-Avoidant Trap Resolution & Attachment Calibration',
         slug: 'anxious-avoidant-trap-resolution',
         description: 'Understand how nervous system activation drives withdraw-pursue cycles and rewire your relational response.',
@@ -729,7 +729,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'family-system-mediation',
         mentor_id: 'maya-sen-rel',
-        category_id: 'relationship',
+        segment_id: 'relationship',
         title: 'High-Stakes Family & Estate Communication Protocol',
         slug: 'high-stakes-family-estate-protocol',
         description: 'Empirical mediation for complex interpersonal dynamics, family business governance, and legacy alignment.',
@@ -779,7 +779,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'co-parenting-architecture',
         mentor_id: 'david-kaufman-rel',
-        category_id: 'relationship',
+        segment_id: 'relationship',
         title: 'Collaborative Co-Parenting & Transition Architecture',
         slug: 'collaborative-co-parenting-transition',
         description: 'Design child-centered schedules, mutual conflict rules, and friction-free communication routines.',
@@ -831,7 +831,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'vp-eng-readiness',
         mentor_id: 'arjun-kapoor-car',
-        category_id: 'career',
+        segment_id: 'career',
         title: 'Director to VP of Engineering Leadership Roadmap',
         slug: 'director-to-vp-engineering-roadmap',
         description: 'Transition from managing managers to driving company-level technology strategy and executive presence.',
@@ -881,7 +881,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'product-exec-elevation',
         mentor_id: 'rachel-zhao-car',
-        category_id: 'career',
+        segment_id: 'career',
         title: 'Product Leadership Strategy & C-Suite Narrative Calibration',
         slug: 'product-leadership-csuite-narrative',
         description: 'Audit your product vision, metrics deck, and cross-functional influence to break into VP of Product roles.',
@@ -931,7 +931,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'founder-to-ceo-pivot',
         mentor_id: 'vikram-singh-car',
-        category_id: 'career',
+        segment_id: 'career',
         title: 'First-Time Founder to High-Performance CEO Strategy',
         slug: 'founder-to-ceo-performance-strategy',
         description: 'Establish executive delegation systems, board reporting frameworks, and sustainable CEO operating cadences.',
@@ -981,7 +981,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'chief-of-staff-acceleration',
         mentor_id: 'elena-moreno-car',
-        category_id: 'career',
+        segment_id: 'career',
         title: 'Chief of Staff Mastery & C-Suite Leverage Acceleration',
         slug: 'chief-of-staff-mastery-acceleration',
         description: 'Level up your impact as the CEO’s strategic right hand and build a launchpad for GM/VP roles.',
@@ -1033,7 +1033,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'acute-anxiety-reset',
         mentor_id: 'dr-charlotte-weber',
-        category_id: 'mental-health',
+        segment_id: 'mental-health',
         title: 'Acute Anxiety De-escalation & Nervous System Reset',
         slug: 'acute-anxiety-deescalation-reset',
         description: 'Clinically proven interoceptive and cognitive tools to neutralize acute panic triggers and reclaim cognitive calm.',
@@ -1083,7 +1083,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'somatic-nervous-system-calibration',
         mentor_id: 'dr-aravind-nair',
-        category_id: 'mental-health',
+        segment_id: 'mental-health',
         title: 'Somatic Nervous System Calibration & Circadian Reset',
         slug: 'somatic-nervous-system-calibration',
         description: 'Comprehensive assessment of nervous system fatigue markers and personalized biological sleep/recovery protocol.',
@@ -1133,7 +1133,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'dopamine-focus-restoration',
         mentor_id: 'dr-leila-kassir',
-        category_id: 'mental-health',
+        segment_id: 'mental-health',
         title: 'Executive Focus Restoration & Dopaminergic Reset Protocol',
         slug: 'executive-focus-restoration-reset',
         description: 'Rebuild sustained deep focus capacity and eliminate compulsive attention switching in high-stress work.',
@@ -1183,7 +1183,7 @@ export const SEED_ADVISORS: AdvisorDetail[] = [
       {
         id: 'imposter-syndrome-breakthrough',
         mentor_id: 'dr-marcus-brooks',
-        category_id: 'mental-health',
+        segment_id: 'mental-health',
         title: 'Executive Imposter Syndrome & Perfectionism Resolution',
         slug: 'executive-imposter-syndrome-resolution',
         description: 'Unpack underlying cognitive schemas that trigger chronic self-doubt and establish robust internal authority.',

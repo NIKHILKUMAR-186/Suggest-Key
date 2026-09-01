@@ -1,8 +1,9 @@
 import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
-import { Category } from '../../lib/supabase/types';
-import { SEED_CATEGORIES, SEED_ADVISORS, AdvisorDetail } from './seedData';
+import { Category, Gig } from '../../lib/supabase/types';
+import { SEED_ADVISORS, AdvisorDetail } from './seedData';
 import { AdvisorFilter, PaginatedAdvisorFilter, PaginatedAdvisorResponse } from './advisor.types';
 import { SegmentService } from '../segment/SegmentService';
+import { AdvisorySegment } from '../segment/SegmentTypes';
 
 export class AdvisorService {
   /**
@@ -141,7 +142,7 @@ export class AdvisorService {
           adv.segment_id === resolvedId ||
           adv.primary_segment_id === resolvedId ||
           adv.verified_categories?.includes(resolvedSlug) ||
-          adv.gigs?.some((g) => g.category_id === resolvedSlug || g.category_id === resolvedId)
+          adv.gigs?.some((g) => g.segment_id === resolvedSlug || g.segment_id === resolvedId)
       );
     }
 
@@ -215,7 +216,7 @@ export class AdvisorService {
             adv.segment_id === resolvedSlug ||
             adv.segment_id === resolvedId ||
             adv.verified_categories?.includes(resolvedSlug) ||
-            adv.gigs?.some((g) => g.category_id === resolvedSlug || g.category_id === resolvedId)
+            adv.gigs?.some((g) => g.segment_id === resolvedSlug || g.segment_id === resolvedId)
         );
       }
 
@@ -271,7 +272,7 @@ export class AdvisorService {
             adv.segment_id === resolvedId ||
             adv.segment_id === resolvedSlug ||
             adv.verified_categories?.includes(resolvedSlug) ||
-            adv.gigs?.some((g) => g.category_id === resolvedSlug || g.category_id === resolvedId)
+            adv.gigs?.some((g) => g.segment_id === resolvedSlug || g.segment_id === resolvedId)
         );
       }
 
@@ -305,7 +306,7 @@ export class AdvisorService {
           adv.segment_id === resolvedSlug ||
           adv.segment_id === resolvedId ||
           adv.verified_categories.includes(resolvedSlug) ||
-          adv.gigs.some((g) => g.category_id === resolvedSlug || g.category_id === resolvedId)
+          adv.gigs.some((g) => g.segment_id === resolvedSlug || g.segment_id === resolvedId)
       );
     }
 
@@ -393,5 +394,27 @@ export class AdvisorService {
     }
 
     return true;
+  }
+
+  /**
+   * Get gig by ID — finds the advisor who owns the gig and returns
+   * the gig, advisor, and associated segment
+   */
+  static async getGigById(
+    gigId: string
+  ): Promise<{ gig: Gig; advisor: AdvisorDetail; segment: AdvisorySegment | null } | null> {
+    const allAdvisors = SEED_ADVISORS;
+    const advisor = allAdvisors.find((adv) =>
+      (adv.gigs || []).some((g) => g.id === gigId || g.slug === gigId)
+    );
+
+    if (!advisor) return null;
+
+    const gig = advisor.gigs?.find((g) => g.id === gigId || g.slug === gigId) || null;
+    if (!gig) return null;
+
+    const segment = SegmentService.getCachedSegmentBySlug(gig.segment_id || advisor.segment_id || advisor.id) || null;
+
+    return { gig, advisor, segment };
   }
 }

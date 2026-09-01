@@ -1,5 +1,6 @@
 import { Profile, Mentor, BookingStatus } from '../../lib/supabase/types';
-import { SEED_ADVISORS, SEED_CATEGORIES } from '../advisor/seedData';
+import { SEED_ADVISORS } from '../advisor/seedData';
+import { SegmentService } from '../segment/SegmentService';
 import { BookingService } from '../booking/BookingService';
 import { PaymentService } from '../payment/PaymentService';
 import { VerificationService } from '../verification/VerificationService';
@@ -217,7 +218,7 @@ export class AdminService {
     return (SEED_ADVISORS || []).map((adv) => ({
       ...adv,
       category_names: (adv.verified_categories || []).map(
-        (catId) => SEED_CATEGORIES.find((c) => c.id === catId)?.name || catId
+        (catId) => SegmentService.getCachedSegmentBySlug(catId)?.name || catId
       ),
       gigs_count: (adv.gigs || []).length,
       tier: (adv.rating || 5) >= 4.95 ? 'Top Rated' : 'Verified Pro',
@@ -404,6 +405,11 @@ export class AdminService {
     };
   }
 
+  static async updateMentorSegment(mentorId: string, segmentIdOrSlug: string): Promise<boolean> {
+    const { AdvisorService } = await import('../advisor/AdvisorService');
+    return AdvisorService.updateAdvisorSegment(mentorId, segmentIdOrSlug);
+  }
+
   static async getSegmentAnalytics() {
     const { SegmentService } = await import('../segment/SegmentService');
     const { AdvisorService } = await import('../advisor/AdvisorService');
@@ -431,15 +437,13 @@ export class AdminService {
           (b.mentor?.verified_categories || []).includes(seg.slug)
       );
 
-      const totalGmv =
-        segBookings.reduce((sum, b) => sum + (b.amount_inr || 0), 0) +
-        segAdvisors.length * 32000;
+      const totalGmv = segBookings.reduce((sum, b) => sum + (b.amount_inr || 0), 0);
 
       return {
         segment: seg,
         advisor_count: segAdvisors.length,
         active_advisor_count: activeAdvisors.length,
-        booking_count: segBookings.length + segAdvisors.length * 12,
+        booking_count: segBookings.length,
         total_gmv_inr: totalGmv,
         pending_verification_count: segAdvisors.filter(
           (a) => a.verification_status === 'review' || a.verification_status === 'pending'

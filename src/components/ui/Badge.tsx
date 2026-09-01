@@ -5,6 +5,8 @@ export interface BadgeProps {
   variant?: 'iris' | 'amber' | 'verdant' | 'neutral' | 'rose';
   size?: 'sm' | 'md';
   className?: string;
+  color?: string;
+  icon?: React.ReactNode;
 }
 
 export const Badge: React.FC<BadgeProps> = ({
@@ -12,6 +14,8 @@ export const Badge: React.FC<BadgeProps> = ({
   variant = 'neutral',
   size = 'sm',
   className = '',
+  color,
+  icon,
 }) => {
   const baseStyles = 'inline-flex items-center gap-1 font-semibold uppercase tracking-wider rounded-full border';
 
@@ -28,8 +32,25 @@ export const Badge: React.FC<BadgeProps> = ({
     rose: 'border-rose-500/30 bg-rose-500/10 text-rose-400',
   };
 
+  if (color) {
+    return (
+      <span
+        className={`${baseStyles} ${sizeStyles[size]} ${className}`}
+        style={{
+          color: color,
+          borderColor: `${color}40`,
+          backgroundColor: `${color}15`,
+        }}
+      >
+        {icon && icon}
+        {children}
+      </span>
+    );
+  }
+
   return (
     <span className={`${baseStyles} ${sizeStyles[size]} ${variantStyles[variant]} ${className}`}>
+      {icon && icon}
       {children}
     </span>
   );

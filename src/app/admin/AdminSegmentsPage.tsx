@@ -48,6 +48,10 @@ const ICON_OPTIONS = [
   { name: 'Users', icon: Users, label: 'Users (Community/Leadership)' },
 ];
 
+const ICON_MAP: Record<string, React.ComponentType<any>> = Object.fromEntries(
+  ICON_OPTIONS.map((opt) => [opt.name, opt.icon])
+);
+
 const PRESET_ACCENTS = [
   { label: 'Purple Accent', value: '#8052ff' },
   { label: 'Amber Gold', value: '#ffb829' },
@@ -251,7 +255,7 @@ export const AdminSegmentsPage: React.FC = () => {
 
   const handleToggleStatus = async (segment: AdvisorySegment) => {
     const nextStatus = !segment.is_active;
-    const updated = await SegmentService.toggleSegmentStatus(segment.id, nextStatus);
+     const updated = await SegmentService.toggleSegmentActive(segment.id);
     if (updated) {
       setSegments((prev) => prev.map((s) => (s.id === segment.id ? updated : s)));
       toast({
@@ -402,8 +406,8 @@ export const AdminSegmentsPage: React.FC = () => {
                 totalRevenueInr: 0,
               };
 
-              const IconComponent =
-                ICON_OPTIONS.find((opt) => opt.name === segment.icon)?.icon || Sparkles;
+              const seg = SegmentService.getCachedSegmentBySlug(segment.slug);
+              const IconComp = ICON_MAP[segment.icon || 'Sparkles'] || Sparkles;
 
               return (
                 <div
@@ -453,7 +457,7 @@ export const AdminSegmentsPage: React.FC = () => {
                         borderColor: `${segment.accent}30`,
                       }}
                     >
-                      <IconComponent className="w-6 h-6" style={{ color: segment.accent }} />
+                      <IconComp className="w-6 h-6" style={{ color: segment.accent }} />
                     </div>
 
                     {/* Name & Content */}

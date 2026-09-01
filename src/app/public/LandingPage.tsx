@@ -5,6 +5,7 @@ import { ConstellationCanvas } from '../../components/visual/ConstellationCanvas
 import { Badge } from '../../components/ui/Badge';
 import { Tag } from '../../components/ui/Tag';
 import { SectionHeader } from '../../components/ui/Headers';
+import { AdvisorySegmentSlug } from '../../domains/segment/SegmentTypes';
 import {
   ArrowRight,
   ArrowUpRight,
@@ -75,34 +76,34 @@ const FEATURED_ADVISORS = [
 
 const ADVISORY_SEGMENTS = [
   {
-    id: 'relationship',
+    id: AdvisorySegmentSlug.Relationship,
     title: 'Relationship Advisory',
     description: 'Partnership calibration, interpersonal dynamics, family systems & high-stakes conflict de-escalation.',
     count: 'Audited Relationship Specialists',
     accent: 'amber' as const,
     badgeText: 'LMFT & Gottman Verified',
     icon: Heart,
-    slug: 'relationship',
+    slug: AdvisorySegmentSlug.Relationship,
   },
   {
-    id: 'career',
+    id: AdvisorySegmentSlug.Career,
     title: 'Career Advisory',
     description: 'Executive leadership, Staff+ engineering trajectories, high-stakes compensation negotiation & strategic pivots.',
     count: 'Audited Career Specialists',
     accent: 'iris' as const,
     badgeText: 'Executive Track Audited',
     icon: Briefcase,
-    slug: 'career',
+    slug: AdvisorySegmentSlug.Career,
   },
   {
-    id: 'mental-health',
+    id: AdvisorySegmentSlug.MentalHealth,
     title: 'Mental Health Advisory',
     description: 'Clinical psychology, executive burnout diagnostics, neuro-resilience protocols & cognitive restructuring.',
     count: 'Licensed Clinical Psychologists',
     accent: 'verdant' as const,
     badgeText: 'Mandatory Clinical Audit',
     icon: Brain,
-    slug: 'mental-health',
+    slug: AdvisorySegmentSlug.MentalHealth,
   },
 ];
 
@@ -236,15 +237,15 @@ export const LandingPage: React.FC = () => {
               <span className="text-xs uppercase tracking-wider text-[#9a9a9a] mr-2">Advisory Paths:</span>
               <Tag
                 label="Relationship Dynamics"
-                onClick={() => navigate('/explore?segment=relationship')}
+                onClick={() => navigate(`/explore?segment=${AdvisorySegmentSlug.Relationship}`)}
               />
               <Tag
                 label="Career & Staff+ Growth"
-                onClick={() => navigate('/explore?segment=career')}
+                onClick={() => navigate(`/explore?segment=${AdvisorySegmentSlug.Career}`)}
               />
               <Tag
                 label="Mental Health & Burnout"
-                onClick={() => navigate('/explore?segment=mental-health')}
+                onClick={() => navigate(`/explore?segment=${AdvisorySegmentSlug.MentalHealth}`)}
               />
             </div>
 
@@ -646,17 +647,17 @@ export const LandingPage: React.FC = () => {
               <span className="text-xs uppercase tracking-wider text-white font-semibold block">Segments</span>
               <ul className="space-y-2 text-xs text-[#9a9a9a]">
                 <li>
-                  <Link to="/explore?segment=relationship" className="hover:text-white transition-colors">
+                  <Link to={`/explore?segment=${AdvisorySegmentSlug.Relationship}`} className="hover:text-white transition-colors">
                     Relationship Advisory
                   </Link>
                 </li>
                 <li>
-                  <Link to="/explore?segment=career" className="hover:text-white transition-colors">
+                  <Link to={`/explore?segment=${AdvisorySegmentSlug.Career}`} className="hover:text-white transition-colors">
                     Career Advisory
                   </Link>
                 </li>
                 <li>
-                  <Link to="/explore?segment=mental-health" className="hover:text-white transition-colors">
+                  <Link to={`/explore?segment=${AdvisorySegmentSlug.MentalHealth}`} className="hover:text-white transition-colors">
                     Mental Health Advisory
                   </Link>
                 </li>

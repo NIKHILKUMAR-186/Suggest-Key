@@ -40,7 +40,7 @@ export class SegmentEducationService {
       id: segment.id,
       slug: segment.slug,
       title: segment.name,
-      badge: segment.advisor_types || `${segment.name} Verified`,
+      badge: (Array.isArray(segment.advisor_types) ? segment.advisor_types.join(', ') : segment.advisor_types) || `${segment.name} Verified`,
       badgeColor: `border-white/20 bg-white/5 text-white`,
       accentColor: accent,
       iconName: segment.icon || 'Sparkles',
@@ -57,7 +57,7 @@ export class SegmentEducationService {
           ],
       whoYouWillFind: {
         description: advisorTypesDesc,
-        badge: segment.advisor_types || '100% Audited',
+        badge: (Array.isArray(segment.advisor_types) ? segment.advisor_types.join(', ') : segment.advisor_types) || '100% Audited',
       },
       whatToExpect: [
         '45-minute confidential 1:1 video consultation',

@@ -140,26 +140,33 @@ ON CONFLICT (slug) DO UPDATE SET
     display_order = EXCLUDED.display_order,
     updated_at = timezone('utc'::text, now());
 
--- 6. Add segment_id column to advisors table if missing & backfill from categories
+-- 6. Add segment_id column to mentors table if missing & backfill from categories
 DO $$ 
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns 
         WHERE table_schema = 'public' 
-        AND table_name = 'advisors' 
+        AND table_name = 'mentors' 
         AND column_name = 'segment_id'
     ) THEN
-        ALTER TABLE public.advisors ADD COLUMN segment_id UUID REFERENCES public.advisory_segments(id) ON DELETE SET NULL;
-        CREATE INDEX IF NOT EXISTS idx_advisors_segment_id ON public.advisors(segment_id);
+        ALTER TABLE public.mentors ADD COLUMN segment_id UUID REFERENCES public.advisory_segments(id) ON DELETE SET NULL;
+        CREATE INDEX IF NOT EXISTS idx_mentors_segment_id ON public.mentors(segment_id);
     END IF;
 END $$;
 
--- 7. Safe backfill for existing advisors pointing to categories
-UPDATE public.advisors a
+-- 7. Safe backfill for existing mentors pointing to categories
+UPDATE public.mentors m
 SET segment_id = s.id
-FROM public.categories c
-JOIN public.advisory_segments s ON s.slug = c.slug
-WHERE a.category_id = c.id AND a.segment_id IS NULL;
+FROM public.advisory_segments s
+WHERE m.segment_id IS NULL
+  AND s.slug = ANY(m.verified_categories)
+  AND s.is_active = true
+  AND s.id = (
+    SELECT id FROM public.advisory_segments
+    WHERE slug = ANY(m.verified_categories) AND is_active = true
+    ORDER BY display_order ASC
+    LIMIT 1
+  );
 
 -- 8. Add segment_id to bookings table for historical preservation if missing
 DO $$ 

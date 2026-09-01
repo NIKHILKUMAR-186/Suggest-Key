@@ -401,21 +401,27 @@ export class SegmentService {
   }
 
   /**
-   * Calculate live segment analytics and metrics dynamically
-   */
-  static async getSegmentMetrics(): Promise<SegmentMetrics[]> {
+    * Calculate live segment analytics and metrics dynamically
+    */
+  static async getSegmentMetrics(segmentIdOrSlug?: string): Promise<SegmentMetrics[]> {
     const segments = await this.getAllSegments(true);
     const metrics: SegmentMetrics[] = [];
 
     for (const segment of segments) {
-      // Aggregate data for this segment
+      if (segmentIdOrSlug && segment.id !== segmentIdOrSlug && segment.slug !== segmentIdOrSlug) {
+        continue;
+      }
+      // Aggregate data for this segment - defer to AdminService for live counts
       metrics.push({
-        segment,
-        advisor_count: 0, // dynamically aggregated in AdminService
-        active_advisor_count: 0,
-        booking_count: 0,
-        total_gmv_inr: 0,
-        pending_verification_count: 0,
+        segmentId: segment.id,
+        segmentSlug: segment.slug,
+        advisorCount: 0,
+        activeAdvisorCount: 0,
+        bookingsCount: 0,
+        revenueInr: 0,
+        totalAdvisorsCount: 0,
+        totalBookingsCount: 0,
+        totalRevenueInr: 0,
       });
     }
 

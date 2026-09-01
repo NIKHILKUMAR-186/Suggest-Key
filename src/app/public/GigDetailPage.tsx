@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { PublicNav } from '../../components/navigation/PublicNav';
 import { AdvisorService } from '../../domains/advisor/AdvisorService';
-import { Gig, Category } from '../../lib/supabase/types';
+import { Gig } from '../../lib/supabase/types';
 import { AdvisorDetail } from '../../domains/advisor/seedData';
 import { useAuth } from '../../domains/auth/AuthContext';
 import { Badge } from '../../components/ui/Badge';
 import { BookingCheckoutModal } from '../../components/booking/BookingCheckoutModal';
+import { AdvisorySegment } from '../../domains/segment/SegmentTypes';
 import {
   ArrowLeft,
   Clock,
@@ -32,7 +33,7 @@ export const GigDetailPage: React.FC = () => {
   const [gigData, setGigData] = useState<{
     gig: Gig;
     advisor: AdvisorDetail;
-    category: Category;
+    segment: AdvisorySegment | null;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
@@ -97,7 +98,7 @@ export const GigDetailPage: React.FC = () => {
     );
   }
 
-  const { gig, advisor, category } = gigData;
+  const { gig, advisor, segment } = gigData;
 
   return (
     <div className="min-h-screen bg-black text-white selection:bg-[#8052ff] selection:text-white flex flex-col justify-between">
@@ -110,8 +111,8 @@ export const GigDetailPage: React.FC = () => {
             Explore
           </Link>
           <ChevronRight className="w-3 h-3" />
-          <Link to={`/explore/${category.slug}`} className="hover:text-white transition-colors uppercase tracking-wider">
-            {category.name}
+          <Link to={`/explore/${segment?.slug || 'all'}`} className="hover:text-white transition-colors uppercase tracking-wider">
+            {segment?.name || 'Advisory Segment'}
           </Link>
           <ChevronRight className="w-3 h-3" />
           <Link to={`/advisors/${advisor.id}`} className="hover:text-white transition-colors uppercase tracking-wider">
@@ -127,7 +128,7 @@ export const GigDetailPage: React.FC = () => {
             <span className="text-xs uppercase tracking-widest text-[#8052ff] font-semibold">
               1:1 Advisory Session
             </span>
-            <Badge variant="iris">{category.name}</Badge>
+            <Badge variant="iris">{segment?.name || 'Advisory Segment'}</Badge>
             {advisor.verification_status === 'approved' && (
               <Badge variant="verdant">100% Audited Advisor</Badge>
             )}

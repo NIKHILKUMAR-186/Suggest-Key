@@ -1,38 +1,28 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { AdvisorDetail } from '../../domains/advisor/seedData';
-import { ShieldCheck, Star, Clock, ArrowRight, CheckCircle2, Heart, Briefcase, Brain } from 'lucide-react';
+import { ShieldCheck, Star, Clock, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { SegmentService } from '../../domains/segment/SegmentService';
+import { DynamicIcon } from '../common/DynamicIcon';
 
 interface AdvisorEditorialCardProps {
   advisor: AdvisorDetail;
   categorySlug?: string;
 }
 
-const SEGMENT_ICONS: Record<string, any> = {
-  relationship: Heart,
-  career: Briefcase,
-  'mental-health': Brain,
-};
-
-const SEGMENT_VARIANTS: Record<string, 'iris' | 'amber' | 'verdant'> = {
-  relationship: 'amber',
-  career: 'iris',
-  'mental-health': 'verdant',
-};
-
 export const AdvisorEditorialCard: React.FC<AdvisorEditorialCardProps> = ({
   advisor,
   categorySlug,
 }) => {
   const primaryGig = (advisor.gigs || [])[0];
-  const seg = SegmentService.getSegmentBySlug(advisor.segment_id || advisor.verified_categories?.[0] || 'career');
-  const segmentSlug = seg?.slug || 'career';
-  const segmentName = seg?.name || advisor.segment_name || 'Career';
+  const seg = SegmentService.getCachedSegmentBySlug(
+    advisor.segment_id || advisor.verified_categories?.[0] || categorySlug
+  );
+  const segmentSlug = seg?.slug || categorySlug || advisor.segment_id || '';
+  const segmentName = seg?.name || advisor.segment_name || categorySlug || 'Advisor';
+  const segmentAccent = seg?.accent || '#8052ff';
   const roleTitle = advisor.role_title || `${segmentName} Advisor`;
-  const IconComponent = SEGMENT_ICONS[segmentSlug] || Briefcase;
-  const badgeVariant = SEGMENT_VARIANTS[segmentSlug] || 'iris';
 
   return (
     <div className="rounded-[28px] border border-white/10 bg-white/[0.02] hover:bg-white/[0.035] hover:border-[#8052ff]/40 p-8 flex flex-col justify-between space-y-6 transition-all duration-300 group relative">
@@ -40,10 +30,10 @@ export const AdvisorEditorialCard: React.FC<AdvisorEditorialCardProps> = ({
         {/* Segment Pill & Verification Status */}
         <div className="flex items-center justify-between gap-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-semibold text-white">
-            <IconComponent className="w-3.5 h-3.5 text-[#8052ff]" />
+            <DynamicIcon name={seg?.icon || 'Sparkles'} className="w-3.5 h-3.5" style={{ color: segmentAccent }} />
             <span>{segmentName}</span>
           </div>
-          <Badge variant={badgeVariant}>
+          <Badge color={segmentAccent}>
             {roleTitle}
           </Badge>
         </div>

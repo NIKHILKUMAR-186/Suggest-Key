@@ -11,6 +11,7 @@ import { AdminService } from '../../domains/admin/AdminService';
 import { BookingCheckoutModal } from '../../components/booking/BookingCheckoutModal';
 import { PaginatedAdvisorCarousel } from '../../components/advisor/PaginatedAdvisorCarousel';
 import { SegmentIntroduction } from '../../components/segment/SegmentIntroduction';
+import { SegmentService } from '../../domains/segment/SegmentService';
 import { Gig } from '../../lib/supabase/types';
 import {
   Calendar,
@@ -464,14 +465,10 @@ export const SeekerBookingsPage: React.FC = () => {
       {filteredBookings.length > 0 ? (
         <div className="space-y-4">
           {filteredBookings.map((booking) => {
-            const segId = booking.mentor?.segment_id || booking.gig?.category_id || 'career';
-            const segLabel = segId === 'relationship' ? 'Relationship' : segId === 'mental-health' ? 'Mental Health' : 'Career';
-            const segBadgeColor =
-              segId === 'relationship'
-                ? 'text-[#ffb829] border-[#ffb829]/30 bg-[#ffb829]/10'
-                : segId === 'mental-health'
-                ? 'text-[#15846e] border-[#15846e]/30 bg-[#15846e]/10'
-                : 'text-[#8052ff] border-[#8052ff]/30 bg-[#8052ff]/10';
+            const segId = booking.mentor?.segment_id || booking.gig?.segment_id || '';
+            const seg = SegmentService.getCachedSegmentBySlug(segId);
+            const segLabel = seg?.name || segId || 'Advisory';
+            const segAccent = seg?.accent || '#8052ff';
 
             return (
               <div
@@ -488,7 +485,14 @@ export const SeekerBookingsPage: React.FC = () => {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-base font-medium text-white">{booking.mentor.full_name}</h3>
-                        <span className={`text-[10px] uppercase font-semibold tracking-wider px-2 py-0.5 rounded-full border ${segBadgeColor}`}>
+                        <span
+                          className="text-[10px] uppercase font-semibold tracking-wider px-2 py-0.5 rounded-full border"
+                          style={{
+                            color: segAccent,
+                            borderColor: `${segAccent}40`,
+                            backgroundColor: `${segAccent}15`,
+                          }}
+                        >
                           {segLabel}
                         </span>
                       </div>

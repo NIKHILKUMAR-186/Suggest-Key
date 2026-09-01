@@ -199,16 +199,20 @@ export const SeekerShell: React.FC = () => {
 
       {/* 2. MAIN APPLICATION BODY (SIDEBAR + CONTENT CANVAS) */}
       <div className="flex-1 flex w-full">
-        {/* Desktop / Tablet Persistent Sidebar */}
-        <div className="hidden md:block shrink-0 sticky top-16 h-[calc(100vh-4rem)] z-30">
+        {/* Desktop / Tablet Persistent Sidebar — fixed pins it to the viewport so it never scrolls away */}
+        <div className="hidden md:block shrink-0 fixed top-16 h-[calc(100vh-4rem)] z-30">
           <SeekerSidebar
             isCollapsed={isSidebarCollapsed}
             onToggleCollapse={toggleSidebarCollapse}
           />
         </div>
 
-        {/* Content Region */}
-        <div className="flex-1 flex flex-col min-w-0 bg-[#050507]">
+        {/* Content Region — offset by the pinned sidebar width (collapsed/expanded) so the fixed sidebar never overlaps content */}
+        <div
+          className={`flex-1 flex flex-col min-w-0 bg-[#050507] transition-[margin-left] duration-200 ease-in-out ${
+            isSidebarCollapsed ? 'md:ml-[76px]' : 'md:ml-[252px]'
+          }`}
+        >
           {/* Primary Segment Switcher (Stays prominently ABOVE page content, outside the sidebar) */}
           <div className="sticky top-16 z-20 bg-[#050507]/90 backdrop-blur-md">
             <PrimarySegmentSwitcher />

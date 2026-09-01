@@ -55,6 +55,7 @@ export interface Mentor {
   review_count: number;
   verification_status: MentorStatus;
   verified_categories: string[];
+  segment_id?: string | null;
   primary_segment_id?: string | null;
   credentials_url?: string | null;
   credentials_verified_at?: string | null;
@@ -65,7 +66,8 @@ export interface Mentor {
 export interface Gig {
   id: string;
   mentor_id: string;
-  category_id: string;
+  segment_id: string;
+  category_id?: string;
   title: string;
   slug: string;
   description: string;
@@ -74,7 +76,9 @@ export interface Gig {
   deliverables: string[];
   is_published: boolean;
   created_at: string;
+  updated_at?: string;
   mentor?: Mentor;
+  segment?: AdvisorySegment;
   category?: Category;
 }
 

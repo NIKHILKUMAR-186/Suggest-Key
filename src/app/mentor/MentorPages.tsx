@@ -5,7 +5,9 @@ import { useToast } from '../../components/ui/Toast';
 import { BookingService, EnrichedBooking } from '../../domains/booking/BookingService';
 import { MessagingService, ChatChannel, ChatMessage } from '../../domains/messaging/MessagingService';
 import { MentorStudioService, AvailabilitySlotRule, MentorEarningsStats } from '../../domains/mentor/MentorStudioService';
-import { Gig, Category } from '../../lib/supabase/types';
+import { SegmentService } from '../../domains/segment/SegmentService';
+import { AdvisorySegment } from '../../domains/segment/SegmentTypes';
+import { Gig } from '../../lib/supabase/types';
 import {
   Sparkles,
   Calendar,
@@ -254,6 +256,7 @@ export const MentorOverviewPage: React.FC = () => {
    2. MENTOR GIGS LIST PAGE
    ========================================================================== */
 export const MentorGigsPage: React.FC = () => {
+  const { profile } = useAuth();
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -261,7 +264,7 @@ export const MentorGigsPage: React.FC = () => {
   useEffect(() => {
     async function loadGigs() {
       setLoading(true);
-      const data = await MentorStudioService.getMentorGigs();
+       const data = await MentorStudioService.getMentorGigs(profile?.id || 'evelyn-vasquez');
       setGigs(data);
       setLoading(false);
     }
@@ -270,7 +273,7 @@ export const MentorGigsPage: React.FC = () => {
 
   const handleDelete = async (gigId: string) => {
     if (confirm('Are you sure you want to remove this advisory offering?')) {
-      await MentorStudioService.deleteGig(gigId);
+      await MentorStudioService.deleteGig(gigId, profile?.id || 'evelyn-vasquez');
       setGigs((prev) => prev.filter((g) => g.id !== gigId));
       toast({ title: 'Gig Removed', description: 'The offering has been archived.' });
     }
@@ -312,7 +315,7 @@ export const MentorGigsPage: React.FC = () => {
                   {gig.is_published ? 'Published' : 'Draft'}
                 </span>
                 <span className="text-[10px] uppercase tracking-wider text-[#8052ff] px-2.5 py-0.5 rounded-full border border-[#8052ff]/30 bg-[#8052ff]/10">
-                  {gig.category_id}
+                  {SegmentService.getCachedSegmentBySlug(gig.segment_id)?.name || gig.segment_id}
                 </span>
               </div>
 
@@ -365,10 +368,12 @@ export const MentorGigEditorPage: React.FC = () => {
   const { gigId } = useParams<{ gigId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { profile } = useAuth();
   const isNew = gigId === 'new';
 
   const [title, setTitle] = useState('');
-  const [categoryId, setCategoryId] = useState('mental-health');
+  const [segments, setSegments] = useState<AdvisorySegment[]>([]);
+  const [segmentId, setSegmentId] = useState('');
   const [description, setDescription] = useState('');
   const [durationMinutes, setDurationMinutes] = useState(45);
   const [priceInr, setPriceInr] = useState(3500);
@@ -383,12 +388,20 @@ export const MentorGigEditorPage: React.FC = () => {
 
   useEffect(() => {
     async function loadGig() {
-      if (isNew) return;
       setLoading(true);
-      const gig = await MentorStudioService.getGigById(gigId!);
+      const allSegments = await SegmentService.getAllSegments(true);
+      setSegments(allSegments);
+      if (allSegments.length > 0 && !segmentId) {
+        setSegmentId(allSegments[0].id);
+      }
+      if (isNew) {
+        setLoading(false);
+        return;
+      }
+      const gig = await MentorStudioService.getGigById(gigId!, profile?.id || 'evelyn-vasquez');
       if (gig) {
         setTitle(gig.title);
-        setCategoryId(gig.category_id);
+        setSegmentId(gig.segment_id);
         setDescription(gig.description);
         setDurationMinutes(gig.duration_minutes);
         setPriceInr(gig.price_inr);
@@ -421,13 +434,13 @@ export const MentorGigEditorPage: React.FC = () => {
     await MentorStudioService.saveGig({
       id: isNew ? undefined : gigId,
       title,
-      category_id: categoryId,
+      segment_id: segmentId,
       description,
       duration_minutes: durationMinutes,
       price_inr: priceInr,
       deliverables,
       is_published: isPublished,
-    });
+    }, profile?.id || 'evelyn-vasquez');
     setSaving(false);
 
     toast({
@@ -473,14 +486,15 @@ export const MentorGigEditorPage: React.FC = () => {
             <div className="space-y-1.5">
               <label className="text-xs uppercase tracking-wider text-[#9a9a9a]">Specialty Domain</label>
               <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
+                value={segmentId}
+                onChange={(e) => setSegmentId(e.target.value)}
                 className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-[#8052ff]"
               >
-                <option value="mental-health">Mental Health & Burnout</option>
-                <option value="engineering-scale">Engineering & Architecture</option>
-                <option value="fundraising-vc">Venture & Fundraising</option>
-                <option value="legal-ip">Legal & IP Advisory</option>
+                 {segments.map((seg) => (
+                   <option key={seg.id} value={seg.id}>
+                     {seg.name}
+                   </option>
+                 ))}
               </select>
             </div>
 

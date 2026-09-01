@@ -1,5 +1,7 @@
-import { Gig, Category } from '../../lib/supabase/types';
-import { SEED_CATEGORIES, SEED_ADVISORS } from '../advisor/seedData';
+import { Gig } from '../../lib/supabase/types';
+import { SegmentService } from '../segment/SegmentService';
+import { INITIAL_SEED_SEGMENTS } from '../segment/SegmentTypes';
+import { SEED_ADVISORS } from '../advisor/seedData';
 
 export interface AvailabilitySlotRule {
   dayOfWeek: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
@@ -41,21 +43,31 @@ const DEFAULT_AVAILABILITY: AvailabilitySlotRule[] = [
 ];
 
 export class MentorStudioService {
+  private static getGigsStorageKey(mentorId: string): string {
+    return `${STORAGE_KEY_GIGS}_${mentorId}`;
+  }
+
   private static getStoredGigs(mentorId: string = 'evelyn-vasquez'): Gig[] {
+    const key = this.getGigsStorageKey(mentorId);
     try {
-      const data = localStorage.getItem(STORAGE_KEY_GIGS);
+      const data = localStorage.getItem(key);
       if (data) return JSON.parse(data);
     } catch (e) {
       console.warn('LocalStorage error reading mentor gigs', e);
     }
-    const defaultGigs = SEED_ADVISORS[0].gigs;
-    localStorage.setItem(STORAGE_KEY_GIGS, JSON.stringify(defaultGigs));
+    const mentorSeed = SEED_ADVISORS.find((a) => a.id === mentorId);
+    const defaultGigs = (mentorSeed?.gigs || SEED_ADVISORS[0].gigs).map((g) => ({
+      ...g,
+      segment_id: g.segment_id || g.category_id || g.id,
+    }));
+    localStorage.setItem(key, JSON.stringify(defaultGigs));
     return defaultGigs;
   }
 
-  private static saveGigs(gigs: Gig[]) {
+  private static saveGigs(mentorId: string, gigs: Gig[]) {
+    const key = this.getGigsStorageKey(mentorId);
     try {
-      localStorage.setItem(STORAGE_KEY_GIGS, JSON.stringify(gigs));
+      localStorage.setItem(key, JSON.stringify(gigs));
     } catch (e) {
       console.warn('LocalStorage error saving mentor gigs', e);
     }
@@ -68,35 +80,57 @@ export class MentorStudioService {
     return this.getStoredGigs(mentorId);
   }
 
-  /**
-   * Get gig by ID
-   */
-  static async getGigById(gigId: string): Promise<Gig | null> {
-    const gigs = this.getStoredGigs();
+  static async getGigById(gigId: string, mentorId: string = 'evelyn-vasquez'): Promise<Gig | null> {
+    const gigs = this.getStoredGigs(mentorId);
     return gigs.find((g) => g.id === gigId || g.slug === gigId) || null;
   }
 
-  /**
-   * Create or update a gig
-   */
-  static async saveGig(gigData: Partial<Gig> & { id?: string }): Promise<Gig> {
-    const gigs = this.getStoredGigs();
+  static async saveGig(
+    gigData: Partial<Gig> & { id?: string; segment_id?: string },
+    mentorId: string = 'evelyn-vasquez'
+  ): Promise<Gig> {
+    const gigs = this.getStoredGigs(mentorId);
+    const activeSegments = await SegmentService.getActiveSegments();
+    const activeSegmentIds = new Set(activeSegments.map((s) => s.id));
+    const activeSegmentSlugs = new Set(activeSegments.map((s) => s.slug));
+
+    const segmentId = gigData.segment_id;
+    const segmentActive =
+      segmentId && (activeSegmentIds.has(segmentId) || activeSegmentSlugs.has(segmentId));
+
+    if (segmentId && !segmentActive) {
+      const err = new Error(
+        'Cannot save gig: selected segment is not active. Mentors can only create gigs under active admin-managed segments.'
+      );
+      (err as any).code = 'ACTIVE_SEGMENT_REQUIRED';
+      throw err;
+    }
+
     const isEdit = Boolean(gigData.id && gigs.some((g) => g.id === gigData.id));
+    const fallbackSegmentId =
+      activeSegments[0]?.id || INITIAL_SEED_SEGMENTS[0]?.id || activeSegments[0]?.slug || INITIAL_SEED_SEGMENTS[0]?.slug;
 
     if (isEdit) {
       const index = gigs.findIndex((g) => g.id === gigData.id);
+      if (index === -1) {
+        const err = new Error('Cannot update gig: you do not have permission to modify this gig.');
+        (err as any).code = 'PERMISSION_DENIED';
+        throw err;
+      }
       const updated: Gig = {
         ...gigs[index],
         ...gigData,
+        segment_id: gigData.segment_id || gigs[index].segment_id,
+        mentor_id: mentorId,
       } as Gig;
       gigs[index] = updated;
-      this.saveGigs(gigs);
+      this.saveGigs(mentorId, gigs);
       return updated;
     } else {
       const newGig: Gig = {
         id: gigData.id || `gig-${Date.now().toString().slice(-6)}`,
-        mentor_id: gigData.mentor_id || 'evelyn-vasquez',
-        category_id: gigData.category_id || 'mental-health',
+        mentor_id: mentorId,
+        segment_id: gigData.segment_id || fallbackSegmentId,
         title: gigData.title || 'Untitled Advisory Session',
         slug: (gigData.title || 'untitled-session').toLowerCase().replace(/\s+/g, '-'),
         description: gigData.description || 'Comprehensive 1:1 advisory consultation.',
@@ -107,18 +141,21 @@ export class MentorStudioService {
         created_at: new Date().toISOString(),
       };
       gigs.unshift(newGig);
-      this.saveGigs(gigs);
+      this.saveGigs(mentorId, gigs);
       return newGig;
     }
   }
 
-  /**
-   * Delete gig
-   */
-  static async deleteGig(gigId: string): Promise<boolean> {
-    const gigs = this.getStoredGigs();
+  static async deleteGig(gigId: string, mentorId: string = 'evelyn-vasquez'): Promise<boolean> {
+    const gigs = this.getStoredGigs(mentorId);
+    const gig = gigs.find((g) => g.id === gigId || g.slug === gigId);
+    if (!gig) {
+      const err = new Error('Cannot delete gig: you do not have permission to delete this gig.');
+      (err as any).code = 'PERMISSION_DENIED';
+      throw err;
+    }
     const filtered = gigs.filter((g) => g.id !== gigId);
-    this.saveGigs(filtered);
+    this.saveGigs(mentorId, filtered);
     return true;
   }
 

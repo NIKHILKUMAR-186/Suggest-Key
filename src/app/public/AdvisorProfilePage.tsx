@@ -4,6 +4,7 @@ import { PublicNav } from '../../components/navigation/PublicNav';
 import { AdvisorService } from '../../domains/advisor/AdvisorService';
 import { AdvisorDetail } from '../../domains/advisor/seedData';
 import { Badge } from '../../components/ui/Badge';
+import { SegmentService } from '../../domains/segment/SegmentService';
 import {
   ArrowLeft,
   ShieldCheck,
@@ -126,7 +127,7 @@ export const AdvisorProfilePage: React.FC = () => {
                     {advisor.profile?.full_name || advisor.full_name || 'Advisor'}
                   </h1>
                   {advisor.segment_name && (
-                    <Badge variant={advisor.segment_id === 'relationship' ? 'amber' : advisor.segment_id === 'mental-health' ? 'verdant' : 'iris'}>
+                    <Badge color={SegmentService.getCachedSegmentBySlug(advisor.segment_id || advisor.verified_categories?.[0] || '')?.accent || '#8052ff'}>
                       {advisor.role_title || `${advisor.segment_name} Advisor`}
                     </Badge>
                   )}

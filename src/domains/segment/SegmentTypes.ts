@@ -18,6 +18,16 @@ export interface AdvisorySegment {
   display_order: number;
   created_at?: string;
   updated_at?: string;
+
+  // Backwards-compatible properties
+  roleTitle?: string;
+  shortDescription?: string;
+  fullDescription?: string;
+  iconName?: string;
+  requiresCredentialVerification?: boolean;
+  focusAreas?: string[];
+  sampleQuestions?: string[];
+  displayOrder?: number;
 }
 
 export interface SegmentMetrics {
@@ -27,6 +37,9 @@ export interface SegmentMetrics {
   activeAdvisorCount: number;
   bookingsCount: number;
   revenueInr: number;
+  totalAdvisorsCount?: number;
+  totalBookingsCount?: number;
+  totalRevenueInr?: number;
 }
 
 export const SEED_ADVISORY_SEGMENTS: AdvisorySegment[] = [
@@ -129,4 +142,11 @@ export const SEED_ADVISORY_SEGMENTS: AdvisorySegment[] = [
 ];
 
 export const INITIAL_SEED_SEGMENTS = SEED_ADVISORY_SEGMENTS;
+
+export const AdvisorySegmentSlug = {
+  Relationship: 'relationship',
+  Career: 'career',
+  MentalHealth: 'mental-health',
+} as const;
+export type AdvisorySegmentSlug = (typeof AdvisorySegmentSlug)[keyof typeof AdvisorySegmentSlug];
 

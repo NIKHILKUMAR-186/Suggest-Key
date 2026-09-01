@@ -125,7 +125,7 @@ export const PrimarySegmentSwitcher: React.FC<PrimarySegmentSwitcherProps> = ({
             const isActive =
               activeSegmentParam === segment.slug ||
               activeSegmentParam === segment.id ||
-              (!activeSegmentParam && segment.slug === 'relationship' && !isDiscoverPage);
+              (!activeSegmentParam && segments.length > 0 && segments[0].slug === segment.slug && !isDiscoverPage);
 
             const accent = segment.accent || '#8052ff';
 

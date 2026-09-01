@@ -5,6 +5,7 @@ import { AdvisorEditorialCard } from '../../components/advisor/AdvisorEditorialC
 import { AdvisorService } from '../../domains/advisor/AdvisorService';
 import { Category } from '../../lib/supabase/types';
 import { AdvisorDetail } from '../../domains/advisor/seedData';
+import { AdvisorySegmentSlug } from '../../domains/segment/SegmentTypes';
 import {
   Search,
   Filter,
@@ -19,7 +20,6 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
-import { AdvisorySegmentSlug } from '../../domains/segment/SegmentTypes';
 
 const ICON_MAP: Record<string, any> = {
   Brain,
@@ -68,12 +68,12 @@ export const ExplorePage: React.FC = () => {
 
   // Filtered advisors
   const filteredAdvisors = advisors.filter((adv) => {
-    // Segment match (strictly check against the 3 segments: relationship, career, mental-health)
+    // Segment match (dynamically resolved from advisory_segments table)
     if (selectedSegment !== 'all') {
       const matchSegment =
         adv.segment_id === selectedSegment ||
         (adv.verified_categories || []).includes(selectedSegment) ||
-        (adv.gigs || []).some((g) => g.category_id === selectedSegment);
+        (adv.gigs || []).some((g) => g.segment_id === selectedSegment);
       if (!matchSegment) return false;
     }
 
@@ -215,7 +215,7 @@ export const ExplorePage: React.FC = () => {
                   (a) =>
                     a.segment_id === cat.slug ||
                     (a.verified_categories || []).includes(cat.slug) ||
-                    (a.gigs || []).some((g) => g.category_id === cat.id)
+                    (a.gigs || []).some((g) => g.segment_id === cat.id)
                 ).length;
 
                 return (
@@ -445,11 +445,11 @@ export const ExplorePage: React.FC = () => {
           <div className="flex items-center gap-3">
             <Link to="/" className="hover:text-white">Home</Link>
             <span>•</span>
-            <Link to="/explore?segment=relationship" className="hover:text-white">Relationship</Link>
+            <Link to={`/explore?segment=${AdvisorySegmentSlug.Relationship}`} className="hover:text-white">Relationship</Link>
             <span>•</span>
-            <Link to="/explore?segment=career" className="hover:text-white">Career</Link>
+            <Link to={`/explore?segment=${AdvisorySegmentSlug.Career}`} className="hover:text-white">Career</Link>
             <span>•</span>
-            <Link to="/explore?segment=mental-health" className="hover:text-white">Mental Health</Link>
+            <Link to={`/explore?segment=${AdvisorySegmentSlug.MentalHealth}`} className="hover:text-white">Mental Health</Link>
             <span>•</span>
             <Link to="/signup?role=mentor" className="hover:text-white">Apply as Advisor</Link>
           </div>
