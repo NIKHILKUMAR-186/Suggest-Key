@@ -1,0 +1,70 @@
+﻿
+> react-example@0.0.0 lint
+> tsc --noEmit
+
+src/app/admin/AdminPages.tsx(226,74): error TS2339: Property 'licensing_board' does not exist on type 'VerificationApplication'.
+src/app/admin/AdminPages.tsx(362,40): error TS2339: Property 'full_name' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/admin/AdminPages.tsx(362,66): error TS2339: Property 'seeker_name' does not exist on type 'EnrichedBooking'.
+src/app/admin/AdminPages.tsx(668,18): error TS2345: Argument of type '(prev: AdminMentorDetail[]) => (true | AdminMentorDetail)[]' is not assignable to parameter of type 'SetStateAction<AdminMentorDetail[]>'.
+  Type '(prev: AdminMentorDetail[]) => (true | AdminMentorDetail)[]' is not assignable to type '(prevState: AdminMentorDetail[]) => AdminMentorDetail[]'.
+    Type '(true | AdminMentorDetail)[]' is not assignable to type 'AdminMentorDetail[]'.
+      Type 'true | AdminMentorDetail' is not assignable to type 'AdminMentorDetail'.
+        Type 'boolean' is not assignable to type 'AdminMentorDetail'.
+src/app/admin/AdminPages.tsx(702,18): error TS2345: Argument of type '(prev: AdminMentorDetail[]) => (true | AdminMentorDetail)[]' is not assignable to parameter of type 'SetStateAction<AdminMentorDetail[]>'.
+  Type '(prev: AdminMentorDetail[]) => (true | AdminMentorDetail)[]' is not assignable to type '(prevState: AdminMentorDetail[]) => AdminMentorDetail[]'.
+    Type '(true | AdminMentorDetail)[]' is not assignable to type 'AdminMentorDetail[]'.
+      Type 'true | AdminMentorDetail' is not assignable to type 'AdminMentorDetail'.
+        Type 'boolean' is not assignable to type 'AdminMentorDetail'.
+src/app/admin/AdminPages.tsx(954,82): error TS2339: Property 'licensing_board' does not exist on type 'VerificationApplication'.
+src/app/admin/AdminPages.tsx(961,20): error TS2339: Property 'rejection_reason' does not exist on type 'VerificationApplication'.
+src/app/admin/AdminPages.tsx(963,42): error TS2339: Property 'rejection_reason' does not exist on type 'VerificationApplication'.
+src/app/admin/AdminPages.tsx(1081,77): error TS2339: Property 'full_name' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/admin/AdminPages.tsx(1083,87): error TS2339: Property 'seeker_name' does not exist on type 'EnrichedBooking'.
+src/app/admin/AdminPages.tsx(1179,86): error TS2339: Property 'created_at' does not exist on type 'LedgerTransaction'.
+src/app/admin/AdminPages.tsx(1355,84): error TS2339: Property 'created_at' does not exist on type 'LedgerTransaction'.
+src/app/admin/AdminSegmentsPage.tsx(161,25): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'SetStateAction<string>'.
+  Type 'string[]' is not assignable to type 'SetStateAction<string>'.
+src/app/mentor/MentorPages.tsx(1655,20): error TS2339: Property 'updateProfile' does not exist on type 'AuthContextType'.
+src/app/public/ExplorePage.tsx(83,53): error TS2339: Property 'full_name' does not exist on type 'AdvisorDetail'.
+src/app/seeker/SeekerPages.tsx(181,37): error TS2339: Property 'segment_name' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(206,45): error TS2339: Property 'avatar_url' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(207,45): error TS2339: Property 'full_name' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(210,50): error TS2339: Property 'full_name' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(579,41): error TS2339: Property 'avatar_url' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(580,41): error TS2339: Property 'full_name' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(586,44): error TS2339: Property 'full_name' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(1037,43): error TS2339: Property 'avatar_url' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(1038,43): error TS2339: Property 'full_name' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(1043,90): error TS2339: Property 'full_name' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(1257,28): error TS2339: Property 'price_inr' does not exist on type 'EnrichedBooking'.
+src/app/seeker/SeekerPages.tsx(1395,35): error TS2339: Property 'avatar_url' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(1396,35): error TS2339: Property 'full_name' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(1400,80): error TS2339: Property 'full_name' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(1455,80): error TS2339: Property 'full_name' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(1609,95): error TS2339: Property 'full_name' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(1642,79): error TS2339: Property 'full_name' does not exist on type 'Mentor & { profile?: Profile; }'.
+src/app/seeker/SeekerPages.tsx(2066,7): error TS2353: Object literal may only specify known properties, and 'channelId' does not exist in type '{ conversationId: string; senderId: string; senderName?: string; senderRole?: "seeker" | "mentor"; senderAvatar?: string; content: string; attachments?: { name: string; url: string; size?: string; }[]; }'.
+src/app/seeker/SeekerPages.tsx(2236,20): error TS2339: Property 'updateProfile' does not exist on type 'AuthContextType'.
+src/components/booking/BookingCheckoutModal.tsx(285,28): error TS2339: Property 'avatar_url' does not exist on type 'AdvisorDetail'.
+src/components/booking/BookingCheckoutModal.tsx(286,28): error TS2339: Property 'full_name' does not exist on type 'AdvisorDetail'.
+src/components/booking/BookingCheckoutModal.tsx(510,52): error TS2339: Property 'full_name' does not exist on type 'AdvisorDetail'.
+src/components/booking/BookingCheckoutModal.tsx(546,52): error TS2339: Property 'full_name' does not exist on type 'AdvisorDetail'.
+src/components/booking/BookingCheckoutModal.tsx(551,52): error TS2339: Property 'full_name' does not exist on type 'AdvisorDetail'.
+src/components/discovery/DomainAdvisorsPage.tsx(49,28): error TS2322: Type 'DiscoveryDomain' is not assignable to type 'string | AdvisorySegment'.
+  Type 'DiscoveryDomain' is missing the following properties from type 'AdvisorySegment': short_description, display_order
+src/domains/discovery/DiscoveryService.ts(53,5): error TS18004: No value exists in scope for the shorthand property 'primary_segment_slug'. Either declare one or provide an initializer.
+src/domains/discovery/DiscoveryService.ts(55,23): error TS2339: Property 'segment_name' does not exist on type 'Mentor & { gigs?: Gig[]; profile?: Profile; mentor_segments?: any[]; }'.
+src/domains/discovery/DiscoveryService.ts(56,21): error TS2339: Property 'role_title' does not exist on type 'Mentor & { gigs?: Gig[]; profile?: Profile; mentor_segments?: any[]; }'.
+src/domains/discovery/DiscoveryService.ts(57,21): error TS2339: Property 'avatar_url' does not exist on type 'Mentor & { gigs?: Gig[]; profile?: Profile; mentor_segments?: any[]; }'.
+src/domains/discovery/DiscoveryService.ts(58,20): error TS2339: Property 'full_name' does not exist on type 'Mentor & { gigs?: Gig[]; profile?: Profile; mentor_segments?: any[]; }'.
+src/domains/discovery/DiscoveryService.ts(114,11): error TS2339: Property 'display_order' does not exist on type 'DiscoveryDomain'.
+src/domains/discovery/DiscoveryService.ts(114,29): error TS2339: Property 'display_order' does not exist on type 'DiscoveryDomain'.
+src/domains/messaging/MessagingService.ts(59,55): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Object literal may only specify known properties, and 'nullsLast' does not exist in type '{ ascending?: boolean; nullsFirst?: boolean; foreignTable?: string; }'.
+src/domains/messaging/MessagingService.ts(159,42): error TS2339: Property 'profile' does not exist on type '{ id: any; headline: any; profile: { id: any; full_name: any; avatar_url: any; }[]; }[]'.
+src/domains/messaging/MessagingService.ts(168,39): error TS2339: Property 'headline' does not exist on type '{ id: any; headline: any; profile: { id: any; full_name: any; avatar_url: any; }[]; }[]'.
+src/domains/messaging/MessagingService.ts(170,36): error TS2339: Property 'full_name' does not exist on type '{}'.
+src/domains/messaging/MessagingService.ts(171,38): error TS2339: Property 'avatar_url' does not exist on type '{}'.
+src/domains/messaging/MessagingService.ts(281,42): error TS2339: Property 'full_name' does not exist on type '{ id: any; full_name: any; avatar_url: any; }[]'.
+src/domains/messaging/MessagingService.ts(282,44): error TS2339: Property 'avatar_url' does not exist on type '{ id: any; full_name: any; avatar_url: any; }[]'.

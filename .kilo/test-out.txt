@@ -1,0 +1,13 @@
+﻿
+> react-example@0.0.0 test
+> vitest run
+
+
+ RUN  v4.1.11 S:/internship/suggest-key
+
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  16:17:36
+   Duration  832ms (transform 76ms, setup 0ms, import 106ms, tests 50ms, environment 442ms)
+

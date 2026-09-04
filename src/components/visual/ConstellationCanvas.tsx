@@ -200,7 +200,7 @@ export const ConstellationCanvas: React.FC<{ className?: string }> = ({ classNam
   return (
     <canvas
       ref={canvasRef}
-      className={`w-full h-full block pointer-events-none ${className}`}
+      className={`w-full h-full block pointer-events ${className}`}
     />
   );
 };

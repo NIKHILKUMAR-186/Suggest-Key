@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   Settings,
   Layers,
+  Target,
 } from 'lucide-react';
 import { ComponentType, ReactNode } from 'react';
 
@@ -48,6 +49,7 @@ export const seekerNavConfig: DashboardShellConfig = {
     { to: '/seeker', label: 'Workspace', icon: LayoutDashboard, end: true, tooltip: 'Workspace' },
     { to: '/seeker/discover', label: 'Discover', icon: Compass, end: false, tooltip: 'Discover' },
     { to: '/seeker/bookings', label: 'Bookings', icon: CalendarDays, end: false, tooltip: 'Bookings' },
+    { to: '/seeker/goals', label: 'Goals', icon: Target, end: false, tooltip: 'Goals' },
     { to: '/seeker/messages', label: 'Messages', icon: MessageSquare, badge: null, end: false, tooltip: 'Messages' },
   ],
   sidebarTitle: 'Suggest Key',
@@ -56,7 +58,8 @@ export const seekerNavConfig: DashboardShellConfig = {
     { to: '/seeker', label: 'Workspace', icon: LayoutDashboard, end: true, tooltip: 'Workspace' },
     { to: '/seeker/discover', label: 'Discover', icon: Compass, end: false, tooltip: 'Discover' },
     { to: '/seeker/bookings', label: 'Bookings', icon: CalendarDays, end: false, tooltip: 'Bookings' },
-    { to: '/seeker/messages', label: 'Messages', icon: MessageSquare, end: false, tooltip: 'Messages' },
+    { to: '/seeker/goals', label: 'Goals', icon: Target, end: false, tooltip: 'Goals' },
+    { to: '/seeker/messages', label: 'Messages', icon: MessageSquare, badge: null, end: false, tooltip: 'Messages' },
   ],
   brandGradientFrom: '#15846e',
   brandGradientTo: '#8052ff',

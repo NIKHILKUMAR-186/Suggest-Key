@@ -6,6 +6,10 @@
 export type UserRole = 'seeker' | 'mentor' | 'admin';
 export type MentorStatus = 'pending' | 'review' | 'approved' | 'rejected' | 'suspended';
 export type BookingStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'failed';
+export type MentorSegmentStatus = 'active' | 'inactive' | 'archived';
+export type BookingRequestStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
+export type GoalStatus = 'active' | 'achieved' | 'paused' | 'archived';
+export type ActionItemStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
 export interface Profile {
   id: string;
@@ -52,7 +56,7 @@ export interface Category {
 }
 
 export interface Mentor {
-  id: string; // references Profile.id
+  id: string;
   headline: string;
   bio: string;
   experience_years: number;
@@ -69,6 +73,22 @@ export interface Mentor {
   created_at: string;
   updated_at?: string;
   profile?: Profile;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  segment_name?: string | null;
+  role_title?: string | null;
+}
+
+export interface MentorSegment {
+  id: string;
+  mentor_id: string;
+  segment_id: string;
+  status: MentorSegmentStatus;
+  display_order: number;
+  created_at: string;
+  updated_at?: string;
+  segment?: AdvisorySegment;
+  mentor?: Mentor;
 }
 
 export interface Gig {
@@ -90,12 +110,29 @@ export interface Gig {
   category?: Category;
 }
 
+export interface Offering {
+  id: string;
+  mentor_segment_id: string;
+  title: string;
+  slug: string;
+  description: string;
+  duration_minutes: number;
+  price_inr: number;
+  deliverables: string[];
+  is_available: boolean;
+  created_at: string;
+  updated_at?: string;
+  mentor_segment?: MentorSegment;
+  mentor?: Mentor;
+  segment?: AdvisorySegment;
+}
+
 export interface AvailabilityRule {
   id: string;
   mentor_id: string;
-  day_of_week: number; // 0 = Sunday, 6 = Saturday
-  start_time: string; // '09:00'
-  end_time: string; // '17:00'
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
   is_active: boolean;
 }
 
@@ -122,6 +159,42 @@ export interface Booking {
   seeker?: Profile;
 }
 
+export interface BookingRequest {
+  id: string;
+  offering_id: string;
+  mentor_id: string;
+  seeker_id: string;
+  status: BookingRequestStatus;
+  proposed_start_time: string;
+  proposed_end_time: string;
+  confirmed_start_time?: string | null;
+  confirmed_end_time?: string | null;
+  meeting_url?: string | null;
+  message?: string | null;
+  notes?: string | null;
+  amount_inr: number;
+  platform_fee_inr?: number;
+  mentor_payout_inr?: number;
+  is_anonymous?: boolean;
+  is_demo?: boolean;
+  created_at: string;
+  updated_at?: string;
+  offering?: Offering;
+  mentor?: Mentor;
+  seeker?: Profile;
+}
+
+export interface BookingAuditLog {
+  id: string;
+  booking_request_id: string;
+  action: string;
+  actor_id: string;
+  from_status?: BookingRequestStatus | null;
+  to_status?: BookingRequestStatus | null;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+}
+
 export interface Conversation {
   id: string;
   booking_id?: string | null;
@@ -138,7 +211,7 @@ export interface Message {
   conversation_id: string;
   sender_id: string;
   content: string;
-  attachments?: any[];
+  attachments?: Record<string, unknown>[];
   created_at: string;
   sender?: Profile;
 }
@@ -169,6 +242,45 @@ export interface Notification {
   title: string;
   message?: string | null;
   is_read: boolean;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   created_at: string;
+}
+
+export interface Goal {
+  id: string;
+  seeker_id: string;
+  title: string;
+  domain: string;
+  description?: string | null;
+  status: GoalStatus;
+  progress: number;
+  target_checkpoint?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface ActionItem {
+  id: string;
+  seeker_id: string;
+  goal_id?: string | null;
+  booking_id?: string | null;
+  title: string;
+  description?: string | null;
+  status: ActionItemStatus;
+  due_date?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface SessionOutcome {
+  id: string;
+  booking_id: string;
+  seeker_id: string;
+  mentor_id: string;
+  summary?: string | null;
+  key_observations: string[];
+  recommended_actions: string[];
+  next_checkpoint?: string | null;
+  created_at: string;
+  updated_at?: string;
 }

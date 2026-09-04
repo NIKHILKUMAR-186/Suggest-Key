@@ -8,10 +8,12 @@ import { ProtectedRoute } from './app/ProtectedRoute';
 import { LandingPage } from './app/public/LandingPage';
 import { ExplorePage } from './app/public/ExplorePage';
 import { CategoryExplorePage } from './app/public/CategoryExplorePage';
+import { DiscoverPage } from './app/public/DiscoverPage';
 import { AdvisorProfilePage } from './app/public/AdvisorProfilePage';
 import { GigDetailPage } from './app/public/GigDetailPage';
 import { LoginPage } from './app/public/LoginPage';
 import { SignupPage } from './app/public/SignupPage';
+import { MentorPublicProfilePage } from './app/public/MentorPublicProfilePage';
 
 // Seeker Shell & Pages
 import { SeekerShell } from './app/seeker/SeekerShell';
@@ -22,6 +24,8 @@ import {
   SeekerBookingDetailPage,
   SeekerMessagesPage,
   SeekerProfilePage,
+  SeekerGoalsPage,
+  SeekerActionItemsPage,
 } from './app/seeker/SeekerPages';
 
 // Mentor Shell & Pages
@@ -45,6 +49,7 @@ import {
   AdminSegmentsPage,
   AdminUsersPage,
   AdminMentorsPage,
+  AdminMentorDetailPage,
   AdminVerificationPage,
   AdminBookingsPage,
   AdminReportsPage,
@@ -63,10 +68,17 @@ export default function App() {
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/auth/sign-in" element={<Navigate to="/login" replace />} />
             <Route path="/auth/sign-up" element={<Navigate to="/signup" replace />} />
-            <Route path="/explore" element={<ExplorePage />} />
-            <Route path="/explore/:category" element={<CategoryExplorePage />} />
-            <Route path="/advisors/:advisorId" element={<AdvisorProfilePage />} />
-            <Route path="/gigs/:gigId" element={<GigDetailPage />} />
+             <Route path="/explore" element={<ExplorePage />} />
+             <Route path="/explore/:category" element={<CategoryExplorePage />} />
+             {/* New Seeker Discovery Experience (domain chooser + problem match + direct domain) */}
+             <Route path="/discover" element={<DiscoverPage />} />
+             <Route path="/discover/:category" element={<DiscoverPage />} />
+             {/* Public advisor profile (legacy — redirects to new mentor public profile) */}
+             <Route path="/advisors/:advisorId" element={<AdvisorProfilePage />} />
+             {/* Role-aware mentor profile routing */}
+             <Route path="/mentor/:mentorId" element={<MentorPublicProfilePage />} />
+              <Route path="/mentor/:mentorId/offering/:gigId" element={<GigDetailPage />} />
+             <Route path="/gigs/:gigId" element={<GigDetailPage />} />
 
             {/* Architecture /app/* Prefixes Aliases */}
             <Route path="/app/seeker/*" element={<Navigate to="/seeker" replace />} />
@@ -88,6 +100,8 @@ export default function App() {
               <Route path="bookings/:bookingId" element={<SeekerBookingDetailPage />} />
               <Route path="messages" element={<SeekerMessagesPage />} />
               <Route path="profile" element={<SeekerProfilePage />} />
+              <Route path="goals" element={<SeekerGoalsPage />} />
+              <Route path="action-items" element={<SeekerActionItemsPage />} />
             </Route>
 
             {/* Mentor Authenticated Domain */}
@@ -122,7 +136,8 @@ export default function App() {
               <Route index element={<AdminOverviewPage />} />
               <Route path="segments" element={<AdminSegmentsPage />} />
               <Route path="users" element={<AdminUsersPage />} />
-              <Route path="mentors" element={<AdminMentorsPage />} />
+               <Route path="mentors" element={<AdminMentorsPage />} />
+              <Route path="mentors/:mentorId" element={<AdminMentorDetailPage />} />
               <Route path="verification" element={<AdminVerificationPage />} />
               <Route path="bookings" element={<AdminBookingsPage />} />
               <Route path="reports" element={<AdminReportsPage />} />

@@ -38,9 +38,9 @@ export const PublicNav: React.FC = () => {
             Explore
           </Link>
           <Link
-            to="/advisors/evelyn-vasquez"
+            to="/explore"
             className={`text-nav-label transition-colors duration-200 ${
-              location.pathname.startsWith('/advisors') ? 'text-white' : 'text-[#9a9a9a] hover:text-white'
+              location.pathname.startsWith('/explore') ? 'text-white' : 'text-[#9a9a9a] hover:text-white'
             }`}
           >
             Advisors
@@ -111,7 +111,7 @@ export const PublicNav: React.FC = () => {
               Explore
             </Link>
             <Link
-              to="/advisors/evelyn-vasquez"
+              to="/explore"
               onClick={() => setMobileMenuOpen(false)}
               className="text-sm font-semibold uppercase tracking-wider text-[#9a9a9a] hover:text-white py-2"
             >

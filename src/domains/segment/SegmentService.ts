@@ -2,10 +2,37 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
 import { AdvisorySegment, SegmentMetrics } from './SegmentTypes';
 import { Category } from '../../lib/supabase/types';
 
+interface RawSegment {
+  id?: string;
+  slug?: string;
+  name?: string;
+  short_description?: string;
+  shortDescription?: string;
+  description?: string;
+  fullDescription?: string;
+  icon?: string;
+  iconName?: string;
+  accent?: string;
+  use_cases?: string[] | string;
+  focusAreas?: string[];
+  audience?: string;
+  advisor_types?: string | string[];
+  credentialBadgeLabel?: string;
+  is_active?: boolean | string;
+  display_order?: number | string;
+  displayOrder?: number | string;
+  created_at?: string;
+  updated_at?: string;
+  roleTitle?: string;
+  tagline?: string;
+  requiresCredentialVerification?: boolean | string;
+  sampleQuestions?: string[];
+}
+
 // Re-export AdvisorySegment for consumers that need the type
 export type { AdvisorySegment, SegmentMetrics } from './SegmentTypes';
 
-function normalizeSegment(raw: any): AdvisorySegment {
+function normalizeSegment(raw: RawSegment): AdvisorySegment {
   const useCases = Array.isArray(raw.use_cases)
     ? raw.use_cases
     : typeof raw.use_cases === 'string'
@@ -43,8 +70,8 @@ function normalizeSegment(raw: any): AdvisorySegment {
     fullDescription: fullDesc,
     tagline: raw.tagline || shortDesc,
     iconName: raw.icon || raw.iconName || 'Sparkles',
-    requiresCredentialVerification: raw.requiresCredentialVerification !== undefined ? raw.requiresCredentialVerification : true,
-    credentialBadgeLabel: raw.advisor_types || raw.credentialBadgeLabel || `${raw.name || 'Domain'} Verified`,
+    requiresCredentialVerification: raw.requiresCredentialVerification !== undefined ? Boolean(raw.requiresCredentialVerification) : true,
+    credentialBadgeLabel: typeof raw.advisor_types === 'string' ? raw.advisor_types : raw.credentialBadgeLabel || `${raw.name || 'Domain'} Verified`,
     focusAreas: useCases,
     sampleQuestions: raw.sampleQuestions || [
       `How do I overcome specific roadblocks in ${raw.name}?`,
@@ -120,7 +147,7 @@ export class SegmentService {
     this.cachedSegments = segments;
   }
 
-  static getCachedSegmentBySlug(slugOrId?: string): AdvisorySegment | null {
+  static getCachedSegmentBySlug(slugOrId?: string | null): AdvisorySegment | null {
     if (!slugOrId) return null;
     const normalized = slugOrId.toLowerCase().trim();
     return (
@@ -143,11 +170,24 @@ export class SegmentService {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('advisory_segments')
-        .select('*')
-        .or(`slug.eq.${normalized},id.eq.${normalized}`)
-        .single();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        normalized
+      );
+
+      let data, error;
+      if (isUuid) {
+        ({ data, error } = await supabase
+          .from('advisory_segments')
+          .select('*')
+          .eq('id', normalized)
+          .single());
+      } else {
+        ({ data, error } = await supabase
+          .from('advisory_segments')
+          .select('*')
+          .eq('slug', normalized)
+          .single());
+      }
 
       if (error || !data) {
         console.error('Error fetching segment:', error);
@@ -316,9 +356,10 @@ export class SegmentService {
       }
 
       return { success: true };
-    } catch (e: any) {
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to delete segment';
       console.error('Error deleting segment:', e);
-      return { success: false, error: e.message || 'Failed to delete segment' };
+      return { success: false, error: message };
     }
   }
 

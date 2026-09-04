@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../../components/ui/Toast';
-import { AdvisorySegment } from '../../domains/segment/SegmentTypes';
+import { AdvisorySegment, SegmentMetrics } from '../../domains/segment/SegmentTypes';
 import { SegmentService } from '../../domains/segment/SegmentService';
 import {
   Layers,
@@ -65,7 +65,7 @@ const PRESET_ACCENTS = [
 
 export const AdminSegmentsPage: React.FC = () => {
   const [segments, setSegments] = useState<AdvisorySegment[]>([]);
-  const [metrics, setMetrics] = useState<Record<string, any>>({});
+  const [metrics, setMetrics] = useState<Record<string, Partial<SegmentMetrics>>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [editingSegment, setEditingSegment] = useState<AdvisorySegment | null>(null);
@@ -98,17 +98,18 @@ export const AdminSegmentsPage: React.FC = () => {
       setSegments(all);
 
       // Load metrics for each segment
-      const metricsMap: Record<string, any> = {};
+      const metricsMap: Record<string, Partial<SegmentMetrics>> = {};
       for (const s of all) {
         try {
-          metricsMap[s.id] = await SegmentService.getSegmentMetrics(s.id);
-        } catch (metricsErr: any) {
+          const result = await SegmentService.getSegmentMetrics(s.id);
+          metricsMap[s.id] = result[0] || { totalAdvisorsCount: 0, totalBookingsCount: 0, totalRevenueInr: 0 };
+        } catch (metricsErr) {
           console.error('[AdminSegments] Failed to load metrics for segment:', s.id, metricsErr.message);
           metricsMap[s.id] = { totalAdvisorsCount: 0, totalBookingsCount: 0, totalRevenueInr: 0 };
         }
       }
       setMetrics(metricsMap);
-    } catch (err: any) {
+    } catch (err) {
       console.error('[AdminSegments] Failed to load segments', err);
       setError(err.message || 'Failed to load advisory segments. Please ensure you are authenticated and have the required permissions.');
       toast({
@@ -158,7 +159,11 @@ export const AdminSegmentsPage: React.FC = () => {
     setFormAccent(segment.accent || '#8052ff');
     setFormBadge(segment.badge || segment.credentialBadgeLabel || '');
     setFormAudience(segment.audience || '');
-    setFormAdvisorTypes(segment.advisor_types || '');
+    setFormAdvisorTypes(
+      Array.isArray(segment.advisor_types)
+        ? segment.advisor_types[0] || ''
+        : segment.advisor_types || ''
+    );
     setFormUseCases(
       Array.isArray(segment.use_cases) && segment.use_cases.length > 0
         ? segment.use_cases
@@ -308,11 +313,13 @@ export const AdminSegmentsPage: React.FC = () => {
 
   const totalActive = segments.filter((s) => s.is_active).length;
   const totalSpecialistsCount = Object.values(metrics).reduce(
-    (sum: number, m: any) => sum + (m?.totalAdvisorsCount || 0),
+    (sum: number, m) =>
+      sum + (Array.isArray(m) ? m[0]?.totalAdvisorsCount || 0 : m?.totalAdvisorsCount || 0),
     0
   );
   const totalBookingsCount = Object.values(metrics).reduce(
-    (sum: number, m: any) => sum + (m?.totalBookingsCount || 0),
+    (sum: number, m) =>
+      sum + (Array.isArray(m) ? m[0]?.totalBookingsCount || 0 : m?.totalBookingsCount || 0),
     0
   );
 
@@ -422,7 +429,8 @@ export const AdminSegmentsPage: React.FC = () => {
         ) : (
           <div className="divide-y divide-white/5">
             {segments.map((segment, index) => {
-              const segMetrics = metrics[segment.id] || {
+              const segMetricsRaw = metrics[segment.id];
+              const segMetrics = (Array.isArray(segMetricsRaw) ? segMetricsRaw[0] : segMetricsRaw) || {
                 totalAdvisorsCount: 0,
                 activeAdvisorsCount: 0,
                 totalBookingsCount: 0,

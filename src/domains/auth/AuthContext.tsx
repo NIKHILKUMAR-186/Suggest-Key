@@ -13,24 +13,17 @@ interface AuthContextType {
   failedAttempts: number;
   isCooldownActive: boolean;
   cooldownSecondsRemaining: number;
-  signIn: (email: string, password?: string, intendedRole?: UserRole) => Promise<{ success: boolean; error?: string; requireVerification?: boolean }>;
+  signIn: (email: string, password?: string) => Promise<{ success: boolean; error?: string; requireVerification?: boolean }>;
   signUp: (email: string, fullName: string, role: UserRole, password?: string, mentorData?: { headline?: string; bio?: string }) => Promise<{ success: boolean; error?: string }>;
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string; message?: string }>;
   signOut: () => Promise<void>;
-  switchRoleForDemo?: (role: UserRole) => void;
+  updateProfile: (updates: Partial<Profile>) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Demo user IDs from seed data (for development bypass only)
-const DEMO_USER_IDS: Record<UserRole, string> = {
-  seeker: '11111111-1111-1111-1111-111111111111',
-  mentor: '22222222-2222-2222-2222-222222222222',
-  admin: '33333333-3333-3333-3333-333333333333',
-};
-
 const MAX_FAILED_ATTEMPTS = 5;
-const COOLDOWN_DURATION_MS = 60 * 1000; // 60 seconds
+const COOLDOWN_DURATION_MS = 60 * 1000;
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any | null>(null);
@@ -41,7 +34,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [cooldownUntil, setCooldownUntil] = useState<number>(0);
   const [cooldownSecondsRemaining, setCooldownSecondsRemaining] = useState<number>(0);
 
-  // Initialize failed attempts and cooldown state from localStorage
   useEffect(() => {
     try {
       if (authConfig.LOGIN_ATTEMPT_LIMIT_ENABLED) {
@@ -66,7 +58,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Cooldown countdown interval
   useEffect(() => {
     if (!authConfig.LOGIN_COOLDOWN_ENABLED || cooldownUntil <= Date.now()) {
       setCooldownSecondsRemaining(0);
@@ -85,27 +76,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [cooldownUntil]);
 
   useEffect(() => {
-    // 1. MASTER SWITCH: AUTH_ENABLED === false -> No authentication
-    if (!authConfig.AUTH_ENABLED) {
-      setUser(null);
-      setProfile(null);
-      setRole(null);
-      setIsLoading(false);
-      return;
-    }
-
-    // 2. DEV_AUTH_BYPASS: Development-only fake auth (NO Supabase session)
-    // WARNING: This mode does NOT authenticate with Supabase.
-    // Database queries will fail with 401 unless RLS allows full anon access.
-    if (authConfig.DEV_AUTH_BYPASS) {
-      const devRole = authConfig.DEV_AUTH_ROLE || 'seeker';
-      loadDemoProfile(devRole);
-      return;
-    }
-
-    // 3. Mock fallback when Supabase is not configured
     if (!isSupabaseConfigured) {
-      console.warn('[Auth] Supabase not configured. Authentication disabled.');
+      console.error('[Auth] Supabase is not configured. Authentication is unavailable.');
       setUser(null);
       setProfile(null);
       setRole(null);
@@ -113,7 +85,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // 4. Live Supabase Authentication
     const checkUser = async () => {
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -124,7 +95,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(session.user);
           await loadProfile(session.user.id);
         } else {
-          // No session - user must log in
           setUser(null);
           setProfile(null);
           setRole(null);
@@ -158,10 +128,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  /**
-   * Load profile from Supabase using authenticated user ID.
-   * No fallback to demo data - if profile doesn't exist, user has no access.
-   */
   const loadProfile = async (userId: string) => {
     try {
       const { data: profData, error: profileError } = await supabase
@@ -192,65 +158,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  /**
-   * Load demo profile for development bypass ONLY.
-   * This does NOT create a Supabase session - RLS-protected queries will fail.
-   */
-  const loadDemoProfile = async (demoRole: UserRole) => {
-    console.warn('[Auth] DEV_AUTH_BYPASS is active - using demo auth (no Supabase session)');
-
-    if (!isSupabaseConfigured) {
-      // Fallback when Supabase is not configured
-      setUser({ id: DEMO_USER_IDS[demoRole], email: `${demoRole}@suggestkey.demo` });
-      setProfile({
-        id: DEMO_USER_IDS[demoRole],
-        email: `${demoRole}@suggestkey.demo`,
-        full_name: demoRole === 'seeker' ? 'Alex Rivera' : demoRole === 'mentor' ? 'Dr. Evelyn Vasquez' : 'Platform Administrator',
-        avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        role: demoRole,
-        is_anonymous_enabled: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-      setRole(demoRole);
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const demoUserId = DEMO_USER_IDS[demoRole];
-      const { data: profData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', demoUserId)
-        .single();
-
-      if (profData) {
-        setUser({ id: profData.id, email: profData.email });
-        setProfile(profData as Profile);
-        setRole(profData.role);
-      } else {
-        // Fallback if demo user doesn't exist in database
-        setUser({ id: demoUserId, email: `${demoRole}@suggestkey.demo` });
-        setProfile({
-          id: demoUserId,
-          email: `${demoRole}@suggestkey.demo`,
-          full_name: demoRole === 'seeker' ? 'Alex Rivera' : demoRole === 'mentor' ? 'Dr. Evelyn Vasquez' : 'Platform Administrator',
-          avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-          role: demoRole,
-          is_anonymous_enabled: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-        setRole(demoRole);
-      }
-    } catch (err: any) {
-      console.error('[Auth] Error loading demo profile:', err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const recordFailedAttempt = () => {
     if (!authConfig.LOGIN_ATTEMPT_LIMIT_ENABLED) return;
     const newCount = failedAttempts + 1;
@@ -277,19 +184,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (
     email: string,
-    password?: string,
-    intendedRole: UserRole = 'seeker'
+    password?: string
   ): Promise<{ success: boolean; error?: string; requireVerification?: boolean }> => {
-    // 1. Development Auth Bypass or Unconfigured Supabase -> Demo mode (no Supabase session)
-    if (authConfig.DEV_AUTH_BYPASS || !isSupabaseConfigured) {
-      console.warn('[Auth] signIn: Using demo auth (no Supabase session)');
-      resetFailedAttempts();
-      await loadDemoProfile(intendedRole);
-      localStorage.setItem('suggestkey_demo_role', intendedRole);
-      return { success: true };
+    if (!isSupabaseConfigured) {
+      return { success: false, error: 'Application is not configured. Please contact support.' };
     }
 
-    // 2. Check cooldown (only active if LOGIN_COOLDOWN_ENABLED is true)
     if (isCooldownActive) {
       const remainingSec = Math.max(1, Math.ceil((cooldownUntil - Date.now()) / 1000));
       return {
@@ -298,7 +198,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    // 3. Check password vs magic link policy
     if (password && !authConfig.PASSWORD_AUTH_ENABLED) {
       return {
         success: false,
@@ -325,7 +224,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           throw error;
         }
         if (data.user) {
-          // Check email verification if required
           if (authConfig.EMAIL_VERIFICATION_REQUIRED && !data.user.email_confirmed_at) {
             setIsLoading(false);
             return {
@@ -338,11 +236,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           resetFailedAttempts();
           setUser(data.user);
           await loadProfile(data.user.id);
-
-          // Verify profile was loaded
-          if (!profile) {
-            console.warn('[Auth] signIn: Profile not found for authenticated user');
-          }
         }
       } else {
         const { error } = await supabase.auth.signInWithOtp({ email });
@@ -366,15 +259,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     password?: string,
     mentorData?: { headline?: string; bio?: string }
   ) => {
-    setIsLoading(true);
-    if (authConfig.DEV_AUTH_BYPASS || !isSupabaseConfigured) {
-      await loadDemoProfile(selectedRole);
-      localStorage.setItem('suggestkey_demo_role', selectedRole);
-      return { success: true };
+    if (!isSupabaseConfigured) {
+      return { success: false, error: 'Application is not configured. Please contact support.' };
     }
 
+    if (selectedRole === 'admin') {
+      return {
+        success: false,
+        error: 'Admin accounts can only be created by an existing administrator.',
+      };
+    }
+
+    setIsLoading(true);
+
     try {
-      const authPassword = password || 'SuggestKeySecurePass123!';
+      const authPassword = password || '';
+      if (!authPassword) {
+        setIsLoading(false);
+        return { success: false, error: 'Password is required for registration.' };
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password: authPassword,
@@ -390,7 +294,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       if (data.user) {
         setUser(data.user);
-        // Create profile in database
         await supabase.from('profiles').upsert({
           id: data.user.id,
           email,
@@ -429,8 +332,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!isSupabaseConfigured) {
       return {
-        success: true,
-        message: 'Password reset email simulated for local development.',
+        success: false,
+        error: 'Application is not configured. Please contact support.',
       };
     }
 
@@ -451,10 +354,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     setIsLoading(true);
 
-    // Clear demo role from localStorage
-    localStorage.removeItem('suggestkey_demo_role');
-
-    if (!isSupabaseConfigured || authConfig.DEV_AUTH_BYPASS) {
+    if (!isSupabaseConfigured) {
       setUser(null);
       setProfile(null);
       setRole(null);
@@ -474,9 +374,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const switchRoleForDemo = (newRole: UserRole) => {
-    loadDemoProfile(newRole);
-    localStorage.setItem('suggestkey_demo_role', newRole);
+  const updateProfile = async (updates: Partial<Profile>): Promise<{ success: boolean; error?: string }> => {
+    if (!profile?.id) {
+      return { success: false, error: 'No authenticated user' };
+    }
+
+    if (!isSupabaseConfigured) {
+      return { success: false, error: 'Application is not configured. Please contact support.' };
+    }
+
+    try {
+      const { error: supabaseError } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', profile.id);
+
+      if (supabaseError) {
+        console.error('[Auth] Profile update error:', supabaseError.message);
+        return { success: false, error: supabaseError.message };
+      }
+
+      setProfile((prev) => (prev ? { ...prev, ...updates } : null));
+      return { success: true };
+    } catch (err: any) {
+      console.error('[Auth] Error updating profile:', err.message);
+      return { success: false, error: err.message || 'Failed to update profile' };
+    }
   };
 
   return (
@@ -495,7 +418,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signUp,
         resetPassword,
         signOut,
-        switchRoleForDemo,
+        updateProfile,
       }}
     >
       {children}

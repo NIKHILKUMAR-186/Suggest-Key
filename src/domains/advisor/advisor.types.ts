@@ -1,5 +1,6 @@
 import { Mentor, Profile } from '../../lib/supabase/types';
 import { AdvisorySegmentSlug } from '../segment/SegmentTypes';
+import type { AdvisorDetail } from './AdvisorService';
 
 export interface AdvisorFilter {
   segment?: AdvisorySegmentSlug | string;
@@ -18,15 +19,11 @@ export interface PaginatedAdvisorFilter extends AdvisorFilter {
 }
 
 export interface PaginatedAdvisorResponse {
-  advisors: AdvisorWithProfile[];
+  advisors: AdvisorDetail[];
   hasMore: boolean;
   page: number;
   limit: number;
   totalCount: number;
   nextCursor?: string | null;
-}
-
-export interface AdvisorWithProfile extends Mentor {
-  profile: Profile;
 }
 

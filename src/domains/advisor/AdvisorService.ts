@@ -1,13 +1,16 @@
 import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
-import { Category, Gig, Mentor, Profile } from '../../lib/supabase/types';
+import { Category, Gig, Mentor, Profile, MentorSegment, Offering, AvailabilityRule } from '../../lib/supabase/types';
 import { AdvisorFilter, PaginatedAdvisorFilter, PaginatedAdvisorResponse } from './advisor.types';
 import { SegmentService } from '../segment/SegmentService';
 import { AdvisorySegment } from '../segment/SegmentTypes';
+import { ReviewDetail } from '../reviews/ReviewService';
 
 export interface AdvisorDetail extends Mentor {
   profile?: Profile;
   gigs?: Gig[];
-  reviews?: any[];
+  offerings?: Offering[];
+  mentor_segments?: MentorSegment[];
+  reviews?: ReviewDetail[];
   segment_id?: string;
   segment_name?: string;
   role_title?: string;
@@ -19,6 +22,74 @@ export interface AdvisorDetail extends Mentor {
     degree?: string;
     institution?: string;
   };
+}
+
+export interface CredentialsSummary {
+  degree?: string;
+  institution?: string;
+  licenseNumber?: string;
+  issuingAuthority?: string;
+  verifiedDate?: string;
+  verifiedAt: string | null;
+  credentialsUrl: string | null;
+  isVerified: boolean;
+  displayLine: string;
+}
+
+export function getCredentialsSummary(
+  advisor: AdvisorDetail
+): CredentialsSummary {
+  const cd = advisor.credentials_detail;
+
+  if (cd && (cd.degree || cd.institution || cd.license_number)) {
+    return {
+      degree: cd.degree,
+      institution: cd.institution,
+      licenseNumber: cd.license_number,
+      issuingAuthority: cd.issuing_authority,
+      verifiedDate: cd.verified_date,
+      verifiedAt: advisor.credentials_verified_at,
+      credentialsUrl: advisor.credentials_url,
+      isVerified: advisor.verification_status === 'approved',
+      displayLine: [cd.degree, cd.institution]
+        .filter(Boolean)
+        .join(', '),
+    };
+  }
+
+  const hasHeadlineCredential =
+    advisor.headline &&
+    /(Ph\.D|Psy\.D|M\.D|LMFT|Licensed|Certified|PhD|MD)/i.test(advisor.headline);
+
+  return {
+    degree: hasHeadlineCredential
+      ? advisor.headline.split('|')[0]?.split(' & ')[0]?.trim()
+      : undefined,
+    institution: undefined,
+    licenseNumber: undefined,
+    issuingAuthority: undefined,
+    verifiedDate: advisor.credentials_verified_at
+      ? new Date(advisor.credentials_verified_at).toLocaleDateString('en-US', {
+          month: 'short',
+          year: 'numeric',
+        })
+      : undefined,
+    verifiedAt: advisor.credentials_verified_at,
+    credentialsUrl: advisor.credentials_url,
+    isVerified: advisor.verification_status === 'approved',
+    displayLine: hasHeadlineCredential
+      ? advisor.headline
+      : advisor.verification_status === 'approved'
+      ? 'Verified Practitioner'
+      : 'Verification Pending',
+  };
+}
+
+export interface AvailabilitySlot {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  isActive: boolean;
 }
 
 export class AdvisorService {
@@ -91,11 +162,13 @@ export class AdvisorService {
 
       if (targetSegment && targetSegment !== 'all') {
         const canonicalSeg = await SegmentService.getSegmentBySlug(targetSegment);
-        const resolvedSlug = canonicalSeg ? canonicalSeg.slug : targetSegment;
-        const resolvedId = canonicalSeg ? canonicalSeg.id : targetSegment;
-
-        // Query by segment_id OR verified_categories array
-        query = query.or(`segment_id.eq.${resolvedId},verified_categories.cs.{${resolvedSlug}}`);
+        const segId = canonicalSeg ? canonicalSeg.id : targetSegment;
+        query = supabase
+          .from('mentors')
+          .select('*, profile:profiles(*), gigs(*), mentor_segments:mentor_segments!inner(segment_id,status)', { count: 'exact' })
+          .eq('verification_status', 'approved')
+          .eq('mentor_segments.segment_id', segId)
+          .eq('mentor_segments.status', 'active');
       }
 
       if (filters.minRating) {
@@ -141,7 +214,7 @@ export class AdvisorService {
       const nextCursor = hasMore && advisorList.length > 0 ? advisorList[advisorList.length - 1].id : null;
 
       return {
-        advisors: advisorList as any,
+        advisors: advisorList,
         hasMore,
         page,
         limit,
@@ -180,10 +253,13 @@ export class AdvisorService {
 
       if (targetSegment && targetSegment !== 'all') {
         const canonicalSeg = await SegmentService.getSegmentBySlug(targetSegment);
-        const resolvedSlug = canonicalSeg ? canonicalSeg.slug : targetSegment;
-        const resolvedId = canonicalSeg ? canonicalSeg.id : targetSegment;
-
-        query = query.or(`segment_id.eq.${resolvedId},verified_categories.cs.{${resolvedSlug}}`);
+        const segId = canonicalSeg ? canonicalSeg.id : targetSegment;
+        query = supabase
+          .from('mentors')
+          .select('*, profile:profiles(*), gigs(*), mentor_segments:mentor_segments!inner(segment_id,status)')
+          .eq('verification_status', 'approved')
+          .eq('mentor_segments.segment_id', segId)
+          .eq('mentor_segments.status', 'active');
       }
 
       if (filters?.minRating) {
@@ -236,8 +312,25 @@ export class AdvisorService {
     try {
       const { data, error } = await supabase
         .from('mentors')
-        .select('*, profile:profiles(*), gigs(*)')
+        .select(`
+          *,
+          profile:profiles(*),
+          gigs(*),
+          mentor_segments:mentor_segments(*),
+          reviews:reviews(
+            *,
+            seeker:profiles(id, full_name, avatar_url)
+          ),
+          offerings:offerings(
+            *,
+            mentor_segment:mentor_segments(
+              *,
+              segment:advisory_segments(*)
+            )
+          )
+        `)
         .eq('id', id)
+        .neq('verification_status', 'suspended')
         .single();
 
       if (error || !data) {
@@ -245,9 +338,166 @@ export class AdvisorService {
         return null;
       }
 
-      return data as AdvisorDetail;
+      const advisorData = data as unknown as AdvisorDetail & {
+        offerings?: Offering[];
+        mentor_segments?: MentorSegment[];
+        reviews?: Array<{
+          id: string;
+          booking_id: string;
+          seeker_id: string;
+          is_anonymous: boolean;
+          mentor_id: string;
+          gig_id?: string;
+          rating: number;
+          rating_expertise?: number;
+          rating_communication?: number;
+          rating_actionability?: number;
+          comment?: string;
+          mentor_response?: string;
+          mentor_response_at?: string;
+          created_at: string;
+          seeker?: { id: string; full_name?: string; avatar_url?: string | null };
+        }>;
+      };
+      if (!advisorData.offerings) {
+        advisorData.offerings = [];
+      }
+      if (!advisorData.mentor_segments) {
+        advisorData.mentor_segments = [];
+      } else {
+        advisorData.mentor_segments = advisorData.mentor_segments.filter(
+          (ms: MentorSegment) => ms.status === 'active'
+        );
+      }
+      if (!advisorData.reviews) {
+        advisorData.reviews = [];
+      } else {
+        advisorData.reviews = advisorData.reviews.map((rev: {
+          id: string;
+          booking_id: string;
+          seeker_id: string;
+          is_anonymous: boolean;
+          mentor_id: string;
+          gig_id?: string;
+          rating: number;
+          rating_expertise?: number;
+          rating_communication?: number;
+          rating_actionability?: number;
+          comment?: string;
+          mentor_response?: string;
+          mentor_response_at?: string;
+          created_at: string;
+          seeker?: { id: string; full_name?: string; avatar_url?: string | null };
+        }) => ({
+          id: rev.id,
+          booking_id: rev.booking_id,
+          seeker_id: rev.seeker_id,
+          seeker_name: rev.seeker?.full_name,
+          seeker_avatar: rev.seeker?.avatar_url,
+          is_anonymous: rev.is_anonymous,
+          mentor_id: rev.mentor_id,
+          gig_id: rev.gig_id,
+          rating: rev.rating,
+          rating_expertise: rev.rating_expertise,
+          rating_communication: rev.rating_communication,
+          rating_actionability: rev.rating_actionability,
+          comment: rev.comment,
+          review_text: rev.comment,
+          mentor_response: rev.mentor_response,
+          mentor_response_at: rev.mentor_response_at,
+          created_at: rev.created_at,
+        }));
+      }
+
+      return advisorData as AdvisorDetail;
     } catch (err) {
       console.error('Error in getAdvisorById:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch all approved advisors enriched with active mentor_segments and
+   * associated advisory_segments (for use_cases). Used by the recommendation
+   * engine. Does NOT include reviews (keep payload light for lists).
+   */
+  static async getAdvisorsWithSegments(): Promise<AdvisorDetail[]> {
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Returning empty advisors.');
+      return [];
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('mentors')
+        .select(`
+          *,
+          profile:profiles(*),
+          mentor_segments:mentor_segments(
+            status,
+            segment:advisory_segments(*)
+          )
+        `)
+        .eq('verification_status', 'approved')
+        .order('rating', { ascending: false })
+        .order('review_count', { ascending: false });
+
+      if (error || !data || data.length === 0) {
+        return [];
+      }
+
+      return data.map((row: Mentor & { profile?: Profile; gigs?: Gig[]; mentor_segments?: MentorSegment[] }) => {
+        const activeSegments = (row.mentor_segments || []).filter(
+          (ms: MentorSegment) => ms.status === 'active'
+        );
+        return {
+          ...row,
+          mentor_segments: activeSegments,
+        } as AdvisorDetail;
+      });
+    } catch (err) {
+      console.error('Error fetching advisors with segments:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Read-only: fetch the next available time slots for a mentor based on
+   * their availability_rules. Returns null when no rules exist (does not
+   * fabricate availability).
+   */
+  static async getNextAvailability(
+    mentorId: string
+  ): Promise<AvailabilitySlot[] | null> {
+    if (!isSupabaseConfigured) {
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('availability_rules')
+        .select('day_of_week, start_time, end_time, is_active')
+        .eq('mentor_id', mentorId)
+        .eq('is_active', true)
+        .order('day_of_week', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching availability rules:', error);
+        return null;
+      }
+
+      if (!data || data.length === 0) {
+        return null;
+      }
+
+      return (data as AvailabilityRule[]).map((rule) => ({
+        dayOfWeek: rule.day_of_week,
+        startTime: rule.start_time,
+        endTime: rule.end_time,
+        isActive: rule.is_active,
+      }));
+    } catch (err) {
+      console.error('Error in getNextAvailability:', err);
       return null;
     }
   }
@@ -350,7 +600,7 @@ export class AdvisorService {
       ]);
 
       const bySegment: { [key: string]: number } = {};
-      mentors?.forEach((m: any) => {
+      mentors?.forEach((m: { segment_id?: string; verified_categories?: string[] }) => {
         const segId = m.segment_id || m.verified_categories?.[0] || 'unknown';
         bySegment[segId] = (bySegment[segId] || 0) + 1;
       });

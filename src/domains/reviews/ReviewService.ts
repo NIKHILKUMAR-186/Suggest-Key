@@ -45,24 +45,24 @@ export class ReviewService {
         return [];
       }
 
-      return (data || []).map((rev: any) => ({
-        id: rev.id,
-        booking_id: rev.booking_id,
-        seeker_id: rev.seeker_id,
-        seeker_name: rev.seeker?.full_name,
-        seeker_avatar: rev.seeker?.avatar_url,
-        is_anonymous: rev.is_anonymous || false,
-        mentor_id: rev.mentor_id,
-        gig_id: rev.gig_id,
-        rating: rev.rating,
-        rating_expertise: rev.rating_expertise,
-        rating_communication: rev.rating_communication,
-        rating_actionability: rev.rating_actionability,
-        review_text: rev.comment,
-        comment: rev.comment,
-        mentor_response: rev.mentor_response,
-        mentor_response_at: rev.mentor_response_at,
-        created_at: rev.created_at,
+      return (data || []).map((rev: Record<string, unknown>) => ({
+        id: rev.id as string,
+        booking_id: rev.booking_id as string,
+        seeker_id: rev.seeker_id as string,
+        seeker_name: (rev.seeker as { full_name?: string } | null)?.full_name,
+        seeker_avatar: (rev.seeker as { avatar_url?: string } | null)?.avatar_url,
+        is_anonymous: rev.is_anonymous === true,
+        mentor_id: rev.mentor_id as string,
+        gig_id: rev.gig_id as string | undefined,
+        rating: rev.rating as number,
+        rating_expertise: rev.rating_expertise as number | undefined,
+        rating_communication: rev.rating_communication as number | undefined,
+        rating_actionability: rev.rating_actionability as number | undefined,
+        review_text: rev.comment as string | undefined,
+        comment: rev.comment as string | undefined,
+        mentor_response: rev.mentor_response as string | undefined,
+        mentor_response_at: rev.mentor_response_at as string | undefined,
+        created_at: rev.created_at as string | undefined,
       }));
     } catch (err) {
       console.error('Error in getReviewsForMentor:', err);
@@ -229,9 +229,10 @@ export class ReviewService {
         mentor_response_at: data.mentor_response_at,
         created_at: data.created_at,
       };
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to submit review.';
       console.error('Error in submitReview:', err);
-      throw new Error(err.message || 'Failed to submit review.');
+      throw new Error(message);
     }
   }
 

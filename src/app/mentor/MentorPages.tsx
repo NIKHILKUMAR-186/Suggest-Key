@@ -7,7 +7,8 @@ import { MessagingService, ChatChannel, ChatMessage } from '../../domains/messag
 import { MentorStudioService, AvailabilitySlotRule, MentorEarningsStats } from '../../domains/mentor/MentorStudioService';
 import { SegmentService } from '../../domains/segment/SegmentService';
 import { AdvisorySegment } from '../../domains/segment/SegmentTypes';
-import { Gig } from '../../lib/supabase/types';
+import { Gig, SessionOutcome } from '../../lib/supabase/types';
+import { SessionOutcomeService } from '../../domains/seeker/SessionOutcomeService';
 import {
   Sparkles,
   Calendar,
@@ -33,6 +34,10 @@ import {
   CreditCard,
   Building,
   User,
+  Route,
+  ListTodo,
+  Target,
+  X,
 } from 'lucide-react';
 
 /* ==========================================================================
@@ -82,7 +87,7 @@ export const MentorOverviewPage: React.FC = () => {
             </span>
           </div>
           <h1 className="text-3xl md:text-4xl font-normal text-white tracking-tight">
-            Welcome back, {profile?.full_name?.split(' ')[0] || 'Dr. Vasquez'}
+            Welcome back, {profile?.full_name?.split(' ')[0] || 'Mentor'}
           </h1>
           <p className="text-sm text-[#9a9a9a] max-w-2xl leading-relaxed">
             Monitor client consultations, configure your weekly booking calendar, manage advisory offerings, and track net disbursements.
@@ -125,7 +130,7 @@ export const MentorOverviewPage: React.FC = () => {
             <span className="text-xs uppercase tracking-wider">Available Balance</span>
             <DollarSign className="w-4 h-4 text-[#ffb829]" />
           </div>
-          <div className="text-3xl font-normal text-white">₹{(earnings?.netPayoutInr || 35700).toLocaleString('en-IN')}</div>
+          <div className="text-3xl font-normal text-white">₹{(earnings?.netPayoutInr || 0).toLocaleString('en-IN')}</div>
           <p className="text-xs text-[#15846e]">Escrow cleared & ready for transfer</p>
         </div>
 
@@ -134,8 +139,8 @@ export const MentorOverviewPage: React.FC = () => {
             <span className="text-xs uppercase tracking-wider">Client Rating</span>
             <ShieldCheck className="w-4 h-4 text-[#8052ff]" />
           </div>
-          <div className="text-3xl font-normal text-white">4.98 ★</div>
-          <p className="text-xs text-[#9a9a9a]">Based on 32 verified consultations</p>
+          <div className="text-3xl font-normal text-white">{(earnings?.avgRating || 0).toFixed(2)} ★</div>
+          <p className="text-xs text-[#9a9a9a]">Based on {(earnings?.reviewCount || 0)} verified consultations</p>
         </div>
       </div>
 
@@ -152,7 +157,7 @@ export const MentorOverviewPage: React.FC = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
             <div className="lg:col-span-2 space-y-3">
-              <h2 className="text-xl md:text-2xl font-normal text-white">{nextSession.gig.title}</h2>
+              <h2 className="text-xl md:text-2xl font-normal text-white">{nextSession.gig?.title ?? 'Advisory Session'}</h2>
               <div className="flex flex-wrap items-center gap-4 text-xs text-[#bdbdbd]">
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-[#8052ff]" />
@@ -166,7 +171,7 @@ export const MentorOverviewPage: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span>Client: {nextSession.is_anonymous ? 'Anonymous Seeker' : nextSession.seeker.full_name}</span>
+                  <span>Client: {nextSession.is_anonymous ? 'Anonymous Seeker' : (nextSession.seeker?.full_name ?? 'Seeker')}</span>
                 </div>
               </div>
 
@@ -419,7 +424,7 @@ export const MentorGigEditorPage: React.FC = () => {
       const gig = await MentorStudioService.getGigById(gigId!, profile.id);
       if (gig) {
         setTitle(gig.title);
-        setSegmentId(gig.segment_id);
+        setSegmentId(gig.segment_id ?? '');
         setDescription(gig.description);
         setDurationMinutes(gig.duration_minutes);
         setPriceInr(gig.price_inr);
@@ -476,10 +481,11 @@ export const MentorGigEditorPage: React.FC = () => {
         description: 'Your advisory gig has been successfully updated.',
       });
       navigate('/mentor/gigs');
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save gig.';
       toast({
         title: 'Error',
-        description: err.message || 'Failed to save gig.',
+        description: message,
       });
     }
     setSaving(false);
@@ -717,7 +723,7 @@ export const MentorAvailabilityPage: React.FC = () => {
 
   const handleSave = async () => {
     setSaving(true);
-    await MentorStudioService.saveAvailability(schedule);
+    await MentorStudioService.saveAvailability(profile?.id || '', schedule);
     setSaving(false);
     toast({
       title: 'Schedule Synchronized',
@@ -857,12 +863,12 @@ export const MentorBookingsPage: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-sm font-semibold text-white">
-                  {booking.is_anonymous ? '?' : booking.seeker.full_name?.charAt(0) || 'S'}
+                  {booking.is_anonymous ? '?' : booking.seeker?.full_name?.charAt(0) || 'S'}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-medium text-white">
-                      {booking.is_anonymous ? 'Anonymous Seeker' : booking.seeker.full_name}
+                      {booking.is_anonymous ? 'Anonymous Seeker' : booking.seeker?.full_name}
                     </h3>
                     {booking.is_anonymous && (
                       <span className="text-[10px] uppercase font-semibold text-[#ffb829] px-2 py-0.5 rounded-full bg-[#ffb829]/10 border border-[#ffb829]/30">
@@ -870,7 +876,7 @@ export const MentorBookingsPage: React.FC = () => {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[#9a9a9a]">{booking.gig.title}</p>
+                  <p className="text-xs text-[#9a9a9a]">{booking.gig?.title ?? 'Advisory Session'}</p>
                 </div>
               </div>
 
@@ -953,6 +959,14 @@ export const MentorBookingDetailPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
+  const [sessionOutcome, setSessionOutcome] = useState<SessionOutcome | null>(null);
+  const [outcomeSummary, setOutcomeSummary] = useState('');
+  const [outcomeObservations, setOutcomeObservations] = useState<string[]>([]);
+  const [outcomeActions, setOutcomeActions] = useState<string[]>([]);
+  const [outcomeCheckpoint, setOutcomeCheckpoint] = useState('');
+  const [newObservation, setNewObservation] = useState('');
+  const [newAction, setNewAction] = useState('');
+
   useEffect(() => {
     async function loadBooking() {
       if (!bookingId) return;
@@ -962,6 +976,14 @@ export const MentorBookingDetailPage: React.FC = () => {
         setBooking(data);
         setSessionNotes(data.session_notes || '');
         setDeliverables(data.deliverables_shared || []);
+        const outcome = await SessionOutcomeService.getSessionOutcomeByBooking(bookingId);
+        if (outcome) {
+          setSessionOutcome(outcome);
+          setOutcomeSummary(outcome.summary || '');
+          setOutcomeObservations(outcome.key_observations || []);
+          setOutcomeActions(outcome.recommended_actions || []);
+          setOutcomeCheckpoint(outcome.next_checkpoint || '');
+        }
       }
       setLoading(false);
     }
@@ -1026,7 +1048,7 @@ export const MentorBookingDetailPage: React.FC = () => {
             <span className="text-[10px] uppercase tracking-widest text-[#8052ff] font-semibold">
               Mentor Session Console
             </span>
-            <h1 className="text-2xl md:text-3xl font-normal text-white">{booking.gig.title}</h1>
+            <h1 className="text-2xl md:text-3xl font-normal text-white">{booking.gig?.title ?? 'Advisory Session'}</h1>
           </div>
 
           <div className="flex items-center gap-2">
@@ -1166,6 +1188,168 @@ export const MentorBookingDetailPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Session Outcome & Roadmap */}
+      <div className="p-6 md:p-8 rounded-[24px] border border-white/10 bg-white/[0.02] space-y-4">
+        <div className="space-y-0.5">
+          <h3 className="text-base font-medium text-white">Session Outcome & Roadmap</h3>
+          <p className="text-xs text-[#9a9a9a]">Structured outcome shared with the seeker after consultation.</p>
+        </div>
+
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-xs uppercase tracking-wider text-[#9a9a9a]">Summary</label>
+            <textarea
+              rows={3}
+              value={outcomeSummary}
+              onChange={(e) => setOutcomeSummary(e.target.value)}
+              placeholder="High-level summary of the session outcome..."
+              className="w-full bg-white/[0.03] border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-[#8052ff]"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs uppercase tracking-wider text-[#9a9a9a]">Key Observations</label>
+            <div className="space-y-2">
+              {outcomeObservations.map((obs, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={obs}
+                    onChange={(e) => {
+                      const updated = [...outcomeObservations];
+                      updated[idx] = e.target.value;
+                      setOutcomeObservations(updated);
+                    }}
+                    className="flex-1 bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#8052ff]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setOutcomeObservations(outcomeObservations.filter((_, i) => i !== idx))}
+                    className="p-2 rounded-full hover:bg-white/10 text-[#ff5c5c]"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newObservation}
+                  onChange={(e) => setNewObservation(e.target.value)}
+                  placeholder="Add observation..."
+                  className="flex-1 bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#8052ff]"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!newObservation.trim()) return;
+                    setOutcomeObservations([...outcomeObservations, newObservation.trim()]);
+                    setNewObservation('');
+                  }}
+                  className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs uppercase tracking-wider font-semibold text-white transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs uppercase tracking-wider text-[#9a9a9a]">Recommended Actions</label>
+            <div className="space-y-2">
+              {outcomeActions.map((action, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={action}
+                    onChange={(e) => {
+                      const updated = [...outcomeActions];
+                      updated[idx] = e.target.value;
+                      setOutcomeActions(updated);
+                    }}
+                    className="flex-1 bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#8052ff]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setOutcomeActions(outcomeActions.filter((_, i) => i !== idx))}
+                    className="p-2 rounded-full hover:bg-white/10 text-[#ff5c5c]"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newAction}
+                  onChange={(e) => setNewAction(e.target.value)}
+                  placeholder="Add recommended action..."
+                  className="flex-1 bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#8052ff]"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!newAction.trim()) return;
+                    setOutcomeActions([...outcomeActions, newAction.trim()]);
+                    setNewAction('');
+                  }}
+                  className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs uppercase tracking-wider font-semibold text-white transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs uppercase tracking-wider text-[#9a9a9a]">Next Checkpoint</label>
+            <input
+              type="date"
+              value={outcomeCheckpoint}
+              onChange={(e) => setOutcomeCheckpoint(e.target.value)}
+              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#8052ff]"
+            />
+          </div>
+        </div>
+
+        <div className="pt-4">
+          <button
+            onClick={async () => {
+              if (!bookingId || !booking) return;
+              setSaving(true);
+              if (sessionOutcome) {
+                await SessionOutcomeService.updateSessionOutcome(sessionOutcome.id, {
+                  summary: outcomeSummary,
+                  keyObservations: outcomeObservations,
+                  recommendedActions: outcomeActions,
+                  nextCheckpoint: outcomeCheckpoint || undefined,
+                });
+              } else {
+                await SessionOutcomeService.createSessionOutcome({
+                  bookingId,
+                  seekerId: booking.seeker_id,
+                  mentorId: booking.mentor_id,
+                  summary: outcomeSummary,
+                  keyObservations: outcomeObservations,
+                  recommendedActions: outcomeActions,
+                  nextCheckpoint: outcomeCheckpoint || undefined,
+                });
+              }
+              setSaving(false);
+              toast({
+                title: 'Session Outcome Saved',
+                description: 'Roadmap has been shared with the seeker.',
+              });
+            }}
+            disabled={saving}
+            className="px-6 py-2.5 rounded-full bg-[#8052ff] hover:bg-[#6c3df0] text-white text-xs font-semibold uppercase tracking-wider flex items-center gap-2 transition-all"
+          >
+            <Save className="w-4 h-4" />
+            <span>{saving ? 'Saving...' : sessionOutcome ? 'Update Outcome' : 'Publish Outcome'}</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -1218,7 +1402,7 @@ export const MentorMessagesPage: React.FC = () => {
       senderId: profile.id,
       senderName: profile.full_name || 'Mentor',
       senderRole: 'mentor',
-      senderAvatar: profile.avatar_url,
+      senderAvatar: profile.avatar_url ?? undefined,
       content: inputText.trim(),
     });
 
@@ -1259,7 +1443,9 @@ export const MentorMessagesPage: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-semibold text-white truncate">{channel.seeker_name}</h4>
                     <span className="text-[10px] text-[#707070]">
-                      {new Date(channel.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {channel.last_message_at
+                        ? new Date(channel.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : ''}
                     </span>
                   </div>
                   <p className="text-[11px] text-[#9a9a9a] truncate mt-0.5">{channel.last_message}</p>
@@ -1389,7 +1575,7 @@ export const MentorEarningsPage: React.FC = () => {
     setPayoutRequested(true);
     toast({
       title: 'Payout Initiated',
-      description: '₹35,700 transfer queued to linked account (••• 4912) via Razorpay Direct.',
+      description: `₹${(stats?.netPayoutInr || 0).toLocaleString('en-IN')} transfer queued to linked account via Razorpay Direct.`,
     });
   };
 
@@ -1404,7 +1590,7 @@ export const MentorEarningsPage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="p-6 md:p-8 rounded-[24px] border border-white/10 bg-white/[0.02] space-y-2">
           <span className="text-xs uppercase tracking-wider text-[#9a9a9a]">Available Net Payout</span>
-          <div className="text-3xl font-normal text-[#15846e]">₹{(stats?.netPayoutInr || 35700).toLocaleString('en-IN')}</div>
+          <div className="text-3xl font-normal text-[#15846e]">₹{(stats?.netPayoutInr || 0).toLocaleString('en-IN')}</div>
           <p className="text-xs text-[#9a9a9a]">Escrow released after session completion</p>
         </div>
 
@@ -1562,7 +1748,7 @@ export const MentorProfilePage: React.FC = () => {
             {saving ? 'Saving...' : 'Save Profile Changes'}
           </button>
           <Link
-            to="/advisors/evelyn-vasquez"
+            to={`/mentor/${profile?.id || ''}`}
             target="_blank"
             className="px-6 py-3 rounded-full border border-white/10 hover:bg-white/5 text-xs uppercase tracking-wider text-[#9a9a9a] hover:text-white transition-colors"
           >

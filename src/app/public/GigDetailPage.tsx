@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { PublicNav } from '../../components/navigation/PublicNav';
 import { AdvisorService } from '../../domains/advisor/AdvisorService';
-import { Gig } from '../../lib/supabase/types';
+import { Gig, Offering } from '../../lib/supabase/types';
 import { AdvisorDetail } from '../../domains/advisor/AdvisorService';
 import { useAuth } from '../../domains/auth/AuthContext';
 import { Badge } from '../../components/ui/Badge';
@@ -39,19 +39,13 @@ export const GigDetailPage: React.FC = () => {
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
 
   // Slot Selection Prototype State
-  const [selectedDate, setSelectedDate] = useState<string>('2026-09-02');
-  const [selectedSlot, setSelectedSlot] = useState<string>('15:00');
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedSlot, setSelectedSlot] = useState<string>('');
   const [seekerIntentNote, setSeekerIntentNote] = useState<string>('');
   const [isAnonymousBooking, setIsAnonymousBooking] = useState<boolean>(false);
 
-  const mockAvailableDates = [
-    { dateStr: '2026-09-02', dayLabel: 'Wed', dateNum: 'Sep 2' },
-    { dateStr: '2026-09-03', dayLabel: 'Thu', dateNum: 'Sep 3' },
-    { dateStr: '2026-09-04', dayLabel: 'Fri', dateNum: 'Sep 4' },
-    { dateStr: '2026-09-07', dayLabel: 'Mon', dateNum: 'Sep 7' },
-  ];
-
-  const mockSlots = ['10:00', '11:30', '15:00', '17:00'];
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
 
   useEffect(() => {
     const loadGig = async () => {
@@ -115,7 +109,7 @@ export const GigDetailPage: React.FC = () => {
             {segment?.name || 'Advisory Segment'}
           </Link>
           <ChevronRight className="w-3 h-3" />
-          <Link to={`/advisors/${advisor.id}`} className="hover:text-white transition-colors uppercase tracking-wider">
+          <Link to={`/mentor/${advisor.id}`} className="hover:text-white transition-colors uppercase tracking-wider">
             {advisor.profile.full_name}
           </Link>
           <ChevronRight className="w-3 h-3" />
@@ -145,7 +139,7 @@ export const GigDetailPage: React.FC = () => {
           {/* Advisor Strip Inside Header */}
           <div className="p-4 sm:p-6 rounded-[24px] border border-white/10 bg-black/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 max-w-3xl">
             <div className="flex items-center gap-4">
-              <Link to={`/advisors/${advisor.id}`}>
+              <Link to={`/mentor/${advisor.id}`}>
                 <img
                   src={advisor.profile.avatar_url || 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&auto=format&fit=crop&q=80'}
                   alt={advisor.profile.full_name}
@@ -155,7 +149,7 @@ export const GigDetailPage: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2">
                   <Link
-                    to={`/advisors/${advisor.id}`}
+                    to={`/mentor/${advisor.id}`}
                     className="font-medium text-base text-white hover:text-[#8052ff] transition-colors"
                   >
                     {advisor.profile.full_name}
@@ -167,7 +161,7 @@ export const GigDetailPage: React.FC = () => {
             </div>
 
             <Link
-              to={`/advisors/${advisor.id}`}
+              to={`/mentor/${advisor.id}`}
               className="text-xs uppercase tracking-wider text-[#8052ff] hover:underline font-semibold"
             >
               View Full Credentials →
@@ -284,24 +278,31 @@ export const GigDetailPage: React.FC = () => {
                   1. Select Available Date
                 </label>
                 <div className="grid grid-cols-4 gap-2">
-                  {mockAvailableDates.map((d) => {
-                    const isSelected = selectedDate === d.dateStr;
+                  {availableDates.length > 0 ? availableDates.map((dateStr) => {
+                    const isSelected = selectedDate === dateStr;
+                    const date = new Date(dateStr + 'T00:00:00');
+                    const dayLabel = date.toLocaleDateString('en-US', { weekday: 'short' });
+                    const dateNum = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                     return (
                       <button
-                        key={d.dateStr}
+                        key={dateStr}
                         type="button"
-                        onClick={() => setSelectedDate(d.dateStr)}
+                        onClick={() => setSelectedDate(dateStr)}
                         className={`p-2.5 rounded-2xl border text-center transition-all ${
                           isSelected
                             ? 'border-[#8052ff] bg-[#8052ff] text-white shadow-md shadow-[#8052ff]/30'
                             : 'border-white/10 bg-white/5 text-[#9a9a9a] hover:text-white hover:border-white/20'
                         }`}
                       >
-                        <div className="text-[10px] uppercase font-light">{d.dayLabel}</div>
-                        <div className="text-xs font-semibold">{d.dateNum}</div>
+                        <div className="text-[10px] uppercase font-light">{dayLabel}</div>
+                        <div className="text-xs font-semibold">{dateNum}</div>
                       </button>
                     );
-                  })}
+                  }) : (
+                    <div className="col-span-4 text-xs text-[#9a9a9a] text-center py-4">
+                      No available dates. Please check back later.
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -311,7 +312,7 @@ export const GigDetailPage: React.FC = () => {
                   2. Select Time Slot (IST)
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {mockSlots.map((slot) => {
+                  {availableSlots.length > 0 ? availableSlots.map((slot) => {
                     const isSelected = selectedSlot === slot;
                     return (
                       <button
@@ -327,7 +328,11 @@ export const GigDetailPage: React.FC = () => {
                         {slot}
                       </button>
                     );
-                  })}
+                  }) : (
+                    <div className="col-span-2 text-xs text-[#9a9a9a] text-center py-4">
+                      No available time slots. Please check back later.
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -398,7 +403,19 @@ export const GigDetailPage: React.FC = () => {
           isOpen={isCheckoutModalOpen}
           onClose={() => setIsCheckoutModalOpen(false)}
           advisor={gigData.advisor}
-          gig={gigData.gig}
+          offering={{
+            id: gigData.gig.id,
+            mentor_segment_id: '',
+            title: gigData.gig.title,
+            slug: gigData.gig.slug,
+            description: gigData.gig.description,
+            duration_minutes: gigData.gig.duration_minutes,
+            price_inr: gigData.gig.price_inr,
+            deliverables: gigData.gig.deliverables,
+            is_available: gigData.gig.is_published,
+            created_at: gigData.gig.created_at,
+            updated_at: gigData.gig.updated_at,
+          } as Offering}
           initialDate={selectedDate}
           initialNotes={seekerIntentNote}
           initialIsAnonymous={isAnonymousBooking}

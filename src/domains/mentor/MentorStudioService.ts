@@ -1,14 +1,14 @@
 import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
-import { Gig } from '../../lib/supabase/types';
+import { Gig, Offering, MentorSegment } from '../../lib/supabase/types';
 import { SegmentService } from '../segment/SegmentService';
 
 export interface AvailabilitySlotRule {
   dayOfWeek: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
   enabled: boolean;
-  startTime: string; // "09:00"
-  endTime: string;   // "17:00"
-  slotDurationMinutes: number; // 45
-  bufferMinutes: number; // 15
+  startTime: string;
+  endTime: string;
+  slotDurationMinutes: number;
+  bufferMinutes: number;
 }
 
 export interface MentorEarningsStats {
@@ -18,6 +18,8 @@ export interface MentorEarningsStats {
   pendingEscrowInr: number;
   completedSessionsCount: number;
   upcomingSessionsCount: number;
+  avgRating?: number;
+  reviewCount?: number;
   payoutHistory: {
     id: string;
     date: string;
@@ -28,15 +30,24 @@ export interface MentorEarningsStats {
   }[];
 }
 
-// Default availability template (UI configuration, not business data)
-const DEFAULT_AVAILABILITY: AvailabilitySlotRule[] = [
-  { dayOfWeek: 'Monday', enabled: true, startTime: '09:00', endTime: '18:00', slotDurationMinutes: 45, bufferMinutes: 15 },
-  { dayOfWeek: 'Tuesday', enabled: true, startTime: '09:00', endTime: '18:00', slotDurationMinutes: 45, bufferMinutes: 15 },
-  { dayOfWeek: 'Wednesday', enabled: true, startTime: '09:00', endTime: '18:00', slotDurationMinutes: 45, bufferMinutes: 15 },
-  { dayOfWeek: 'Thursday', enabled: true, startTime: '09:00', endTime: '18:00', slotDurationMinutes: 45, bufferMinutes: 15 },
-  { dayOfWeek: 'Friday', enabled: true, startTime: '09:00', endTime: '16:00', slotDurationMinutes: 45, bufferMinutes: 15 },
-  { dayOfWeek: 'Saturday', enabled: false, startTime: '10:00', endTime: '14:00', slotDurationMinutes: 45, bufferMinutes: 15 },
-  { dayOfWeek: 'Sunday', enabled: false, startTime: '10:00', endTime: '14:00', slotDurationMinutes: 45, bufferMinutes: 15 },
+interface AvailabilityRuleRow {
+  mentor_id: string;
+  day_of_week: AvailabilitySlotRule['dayOfWeek'];
+  is_enabled: boolean;
+  start_time: string;
+  end_time: string;
+  slot_duration_minutes: number;
+  buffer_minutes: number;
+}
+
+const DAY_NAMES: AvailabilitySlotRule['dayOfWeek'][] = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
 ];
 
 export class MentorStudioService {
@@ -118,25 +129,27 @@ export class MentorStudioService {
       throw new Error('A valid active segment is required to create a gig.');
     }
 
-    // Validate segment is active
     const segment = await SegmentService.getSegmentBySlug(gigData.segment_id);
     if (!segment) {
-      const err = new Error('Selected segment does not exist.');
-      (err as any).code = 'SEGMENT_NOT_FOUND';
+      const err: Error & { code: string } = Object.assign(
+        new Error('Selected segment does not exist.'),
+        { code: 'SEGMENT_NOT_FOUND' }
+      );
       throw err;
     }
     if (!segment.is_active) {
-      const err = new Error(
-        'Cannot save gig: selected segment is not active. Mentors can only create gigs under active admin-managed segments.'
+      const err: Error & { code: string } = Object.assign(
+        new Error(
+          'Cannot save gig: selected segment is not active. Mentors can only create gigs under active admin-managed segments.'
+        ),
+        { code: 'ACTIVE_SEGMENT_REQUIRED' }
       );
-      (err as any).code = 'ACTIVE_SEGMENT_REQUIRED';
       throw err;
     }
 
     const isEdit = Boolean(gigData.id);
 
     if (isEdit) {
-      // Update existing gig — ownership enforced by .eq('mentor_id', mentorId)
       const { data, error } = await supabase
         .from('gigs')
         .update({
@@ -159,7 +172,6 @@ export class MentorStudioService {
 
       return data;
     } else {
-      // Create new gig — segment_id must reference an active segment
       const slug = gigData.title
         .trim()
         .toLowerCase()
@@ -209,30 +221,74 @@ export class MentorStudioService {
   }
 
   /**
-   * Get availability schedule (stored in localStorage as UI preference)
+   * Get availability schedule from the availability_rules table.
    */
-  static async getAvailability(mentorId: string = 'current'): Promise<AvailabilitySlotRule[]> {
-    const STORAGE_KEY_AVAILABILITY = 'suggestkey_mentor_availability';
-    try {
-      const data = localStorage.getItem(STORAGE_KEY_AVAILABILITY);
-      if (data) return JSON.parse(data);
-    } catch (e) {
-      console.warn('LocalStorage error reading availability', e);
+  static async getAvailability(mentorId: string): Promise<AvailabilitySlotRule[]> {
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Returning empty availability.');
+      return [];
     }
-    return DEFAULT_AVAILABILITY;
+
+    try {
+      const { data, error } = await supabase
+        .from('availability_rules')
+        .select('*')
+        .eq('mentor_id', mentorId);
+
+      if (error || !data) {
+        console.error('Error fetching availability rules:', error);
+        return [];
+      }
+
+      return (data as AvailabilityRuleRow[]).map((row) => ({
+        dayOfWeek: row.day_of_week,
+        enabled: !!row.is_enabled,
+        startTime: row.start_time,
+        endTime: row.end_time,
+        slotDurationMinutes: row.slot_duration_minutes,
+        bufferMinutes: row.buffer_minutes,
+      }));
+    } catch (err) {
+      console.error('Error in getAvailability:', err);
+      return [];
+    }
   }
 
   /**
-   * Save availability schedule (stored in localStorage as UI preference)
+   * Save availability schedule to the availability_rules table.
    */
-  static async saveAvailability(rules: AvailabilitySlotRule[]): Promise<AvailabilitySlotRule[]> {
-    const STORAGE_KEY_AVAILABILITY = 'suggestkey_mentor_availability';
-    try {
-      localStorage.setItem(STORAGE_KEY_AVAILABILITY, JSON.stringify(rules));
-    } catch (e) {
-      console.warn('LocalStorage error saving availability', e);
+  static async saveAvailability(
+    mentorId: string,
+    rules: AvailabilitySlotRule[]
+  ): Promise<AvailabilitySlotRule[]> {
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase not configured. Cannot save availability.');
     }
-    return rules;
+
+    try {
+      const upsertRows = rules.map((rule) => ({
+        mentor_id: mentorId,
+        day_of_week: rule.dayOfWeek,
+        is_enabled: rule.enabled,
+        start_time: rule.startTime,
+        end_time: rule.endTime,
+        slot_duration_minutes: rule.slotDurationMinutes,
+        buffer_minutes: rule.bufferMinutes,
+      }));
+
+      const { error } = await supabase
+        .from('availability_rules')
+        .upsert(upsertRows, { onConflict: 'mentor_id,day_of_week' });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to save availability rules.');
+      }
+
+      return rules;
+    } catch (err) {
+      console.error('Error in saveAvailability:', err);
+      throw err;
+    }
   }
 
   /**
@@ -252,14 +308,12 @@ export class MentorStudioService {
     }
 
     try {
-      // Get completed bookings
       const { data: completedBookings, error: completedError } = await supabase
         .from('bookings')
         .select('amount_inr, platform_fee_inr, mentor_payout_inr')
         .eq('mentor_id', mentorId)
         .eq('status', 'completed');
 
-      // Get upcoming bookings
       const { data: upcomingBookings, error: upcomingError } = await supabase
         .from('bookings')
         .select('amount_inr')
@@ -285,7 +339,7 @@ export class MentorStudioService {
         pendingEscrowInr,
         completedSessionsCount: completed.length,
         upcomingSessionsCount: upcoming.length,
-        payoutHistory: [], // Would be populated from a payouts table in a full implementation
+        payoutHistory: [],
       };
     } catch (err) {
       console.error('Error in getEarningsStats:', err);
@@ -300,4 +354,239 @@ export class MentorStudioService {
       };
     }
   }
+
+  static async getMentorSegments(mentorId: string): Promise<MentorSegment[]> {
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Returning empty segments.');
+      return [];
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('mentor_segments')
+        .select('*, segment:advisory_segments(*)')
+        .eq('mentor_id', mentorId)
+        .order('display_order', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching mentor segments:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('Error in getMentorSegments:', err);
+      return [];
+    }
+  }
+
+  static async getMentorOfferings(mentorId: string): Promise<Offering[]> {
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Returning empty offerings.');
+      return [];
+    }
+
+    try {
+      const { data: msData, error: msError } = await supabase
+        .from('mentor_segments')
+        .select('id')
+        .eq('mentor_id', mentorId)
+        .eq('status', 'active');
+
+      if (msError || !msData || msData.length === 0) {
+        return [];
+      }
+
+      const msIds = msData.map((ms) => ms.id);
+
+      const { data: offeringsData, error: offeringsError } = await supabase
+        .from('offerings')
+        .select('*, mentor_segment:mentor_segments(*, segment:advisory_segments(*))')
+        .in('mentor_segment_id', msIds)
+        .order('created_at', { ascending: false });
+
+      if (offeringsError) {
+        console.error('Error fetching offerings:', offeringsError);
+        return [];
+      }
+
+      return offeringsData || [];
+    } catch (err) {
+      console.error('Error in getMentorOfferings:', err);
+      return [];
+    }
+  }
+
+  static async getOfferingById(offeringId: string, mentorId?: string): Promise<Offering | null> {
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Cannot fetch offering.');
+      return null;
+    }
+
+    try {
+      let query = supabase
+        .from('offerings')
+        .select(`
+          *,
+          mentor_segment:mentor_segments(*, segment:advisory_segments(*))
+        `)
+        .or(`id.eq.${offeringId},slug.eq.${offeringId}`);
+
+      if (mentorId) {
+        query = query.eq('mentor_segment.mentor_id', mentorId);
+      }
+
+      const { data, error } = await query.single();
+
+      if (error || !data) {
+        console.error('Error fetching offering:', error);
+        return null;
+      }
+
+      return data;
+    } catch (err) {
+      console.error('Error in getOfferingById:', err);
+      return null;
+    }
+  }
+
+  static async saveOffering(
+    offeringData: Partial<Offering> & { id?: string; mentor_segment_id: string },
+    mentorId: string
+  ): Promise<Offering> {
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase not configured. Cannot save offering.');
+    }
+
+    if (!mentorId) {
+      throw new Error('Mentor ID is required to save an offering.');
+    }
+
+    if (!offeringData.mentor_segment_id) {
+      throw new Error('A mentor segment ID is required to create an offering.');
+    }
+
+    if (!offeringData.title || !offeringData.title.trim()) {
+      throw new Error('Offering title is required.');
+    }
+
+    if (!offeringData.duration_minutes || !offeringData.price_inr) {
+      throw new Error('Duration and price are required.');
+    }
+
+    const { data: msCheck, error: msCheckError } = await supabase
+      .from('mentor_segments')
+      .select('id')
+      .eq('id', offeringData.mentor_segment_id)
+      .eq('mentor_id', mentorId)
+      .eq('status', 'active')
+      .single();
+
+    if (msCheckError || !msCheck) {
+      throw new Error('You do not have permission to create offerings in this segment.');
+    }
+
+    const isEdit = Boolean(offeringData.id);
+
+    if (isEdit) {
+      const { data, error } = await supabase
+        .from('offerings')
+        .update({
+          title: offeringData.title.trim(),
+          description: offeringData.description?.trim() || '',
+          duration_minutes: offeringData.duration_minutes,
+          price_inr: offeringData.price_inr,
+          deliverables: offeringData.deliverables || [],
+          is_available: offeringData.is_available,
+        })
+        .eq('id', offeringData.id)
+        .select(`
+          *,
+          mentor_segment:mentor_segments(*, segment:advisory_segments(*))
+        `)
+        .single();
+
+      if (error || !data) {
+        throw new Error(error?.message || 'Cannot update offering: you do not have permission.');
+      }
+
+      return data;
+    } else {
+      const slug = offeringData.title
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+
+      const { data, error } = await supabase
+        .from('offerings')
+        .insert({
+          mentor_segment_id: offeringData.mentor_segment_id,
+          title: offeringData.title.trim(),
+          slug: slug || `offering-${Date.now()}`,
+          description: offeringData.description?.trim() || '',
+          duration_minutes: offeringData.duration_minutes,
+          price_inr: offeringData.price_inr,
+          deliverables: offeringData.deliverables || [],
+          is_available: offeringData.is_available ?? true,
+        })
+        .select(`
+          *,
+          mentor_segment:mentor_segments(*, segment:advisory_segments(*))
+        `)
+        .single();
+
+      if (error || !data) {
+        throw new Error(error?.message || 'Failed to create offering.');
+      }
+
+      return data;
+    }
+  }
+
+  static async deleteOffering(offeringId: string, mentorId: string): Promise<boolean> {
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase not configured. Cannot delete offering.');
+    }
+
+    const { error } = await supabase
+      .from('offerings')
+      .delete()
+      .eq('id', offeringId)
+      .eq('mentor_segment_id', (query) =>
+        query.from('mentor_segments').select('id').eq('mentor_id', mentorId)
+      );
+
+    if (error) {
+      throw new Error(error.message || 'Cannot delete offering: you do not have permission.');
+    }
+
+    return true;
+  }
+
+  static async setOfferingAvailability(
+    offeringId: string,
+    isAvailable: boolean,
+    mentorId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: 'Supabase not configured' };
+    }
+
+    const { error } = await supabase
+      .from('offerings')
+      .update({ is_available: isAvailable })
+      .eq('id', offeringId)
+      .eq('mentor_segment_id', (query) =>
+        query.from('mentor_segments').select('id').eq('mentor_id', mentorId)
+      );
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  }
 }
+
+export { DAY_NAMES };

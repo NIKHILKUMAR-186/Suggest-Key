@@ -7,9 +7,9 @@ export interface EnrichedBooking extends Booking {
   gig?: Gig;
   mentor?: Mentor & { profile?: Profile };
   seeker?: Profile;
+  seeker_name?: string;
   platform_fee_inr?: number;
   mentor_payout_inr?: number;
-  payment_status?: string;
   deliverables_shared?: string[];
   session_notes?: string;
   is_anonymous?: boolean;
@@ -250,12 +250,13 @@ export class BookingService {
         success: true,
         booking: this.enrichBooking(bookingData),
       };
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred while creating the booking.';
       console.error('Error in createAtomicBooking:', err);
       return {
         success: false,
         error: 'BOOKING_ERROR',
-        message: err.message || 'An unexpected error occurred while creating the booking.',
+        message,
       };
     }
   }
@@ -293,7 +294,7 @@ export class BookingService {
     }
 
     try {
-      const updateData: any = { status };
+      const updateData: Partial<Booking> = { status };
 
       if (extra?.session_notes !== undefined) {
         updateData.notes = extra.session_notes;
@@ -420,12 +421,11 @@ export class BookingService {
   /**
    * Enrich booking data with computed fields
    */
-  private static enrichBooking(raw: any): EnrichedBooking {
+  private static enrichBooking(raw: Booking): EnrichedBooking {
     const booking: EnrichedBooking = {
       ...raw,
       platform_fee_inr: raw.platform_fee_inr || Math.round((raw.amount_inr || 0) * 0.15),
       mentor_payout_inr: raw.mentor_payout_inr || Math.round((raw.amount_inr || 0) * 0.85),
-      payment_status: raw.payment_status || 'paid',
     };
 
     return booking;

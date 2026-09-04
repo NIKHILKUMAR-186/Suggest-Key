@@ -1,6 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { AdvisorDetail } from '../../domains/advisor/AdvisorService';
+import {
+  AdvisorDetail,
+  getCredentialsSummary,
+} from '../../domains/advisor/AdvisorService';
 import { ShieldCheck, Star, Clock, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { SegmentService } from '../../domains/segment/SegmentService';
@@ -24,6 +27,24 @@ export const AdvisorEditorialCard: React.FC<AdvisorEditorialCardProps> = ({
   const segmentAccent = seg?.accent || '#8052ff';
   const roleTitle = advisor.role_title || `${segmentName} Advisor`;
 
+  const creds = getCredentialsSummary(advisor);
+
+  const activeSegments = (advisor.mentor_segments || [])
+    .filter((ms) => ms.status === 'active')
+    .map((ms) => {
+      const segData =
+        ms.segment ||
+        (ms.segment_id
+          ? SegmentService.getCachedSegmentBySlug(ms.segment_id)
+          : null);
+      return {
+        slug: segData?.slug || ms.segment_id,
+        name: segData?.name || ms.segment_id,
+        accent: segData?.accent || segmentAccent,
+        icon: segData?.icon || 'Sparkles',
+      };
+    });
+
   return (
     <div className="rounded-[28px] border border-white/10 bg-white/[0.02] hover:bg-white/[0.035] hover:border-[#8052ff]/40 p-8 flex flex-col justify-between space-y-6 transition-all duration-300 group relative">
       <div className="space-y-6">
@@ -40,10 +61,10 @@ export const AdvisorEditorialCard: React.FC<AdvisorEditorialCardProps> = ({
 
         {/* Header Profile Row */}
         <div className="flex items-start gap-5">
-          <Link to={`/advisors/${advisor.id}`} className="shrink-0 relative">
+          <Link to={`/mentor/${advisor.id}`} className="shrink-0 relative">
             <img
-              src={advisor.profile?.avatar_url || advisor.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'}
-              alt={advisor.profile?.full_name || advisor.full_name || 'Advisor'}
+              src={advisor.profile?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'}
+              alt={advisor.profile?.full_name || 'Advisor'}
               className="w-16 h-16 sm:w-20 sm:h-20 rounded-[22px] object-cover border border-white/10 group-hover:border-[#8052ff]/50 transition-colors"
             />
             {advisor.verification_status === 'approved' && (
@@ -56,12 +77,12 @@ export const AdvisorEditorialCard: React.FC<AdvisorEditorialCardProps> = ({
           <div className="space-y-1.5 flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <Link
-                to={`/advisors/${advisor.id}`}
+                to={`/mentor/${advisor.id}`}
                 className="text-lg sm:text-xl font-medium text-white group-hover:text-[#8052ff] transition-colors truncate"
               >
-                {advisor.profile?.full_name || advisor.full_name || 'Advisor'}
+                {advisor.profile?.full_name || 'Advisor'}
               </Link>
-              {advisor.credentials_detail?.degree && (
+              {creds.isVerified && (
                 <span className="text-[11px] text-[#15846e] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#15846e]/10 border border-[#15846e]/20">
                   Audited
                 </span>
@@ -72,13 +93,27 @@ export const AdvisorEditorialCard: React.FC<AdvisorEditorialCardProps> = ({
               {advisor.headline}
             </p>
 
-            {advisor.credentials_detail && (
+            {creds.isVerified && creds.displayLine && (
               <p className="text-[11px] text-[#9a9a9a] leading-tight line-clamp-1">
-                {advisor.credentials_detail.institution} • {advisor.experience_years || 5}+ yrs practice
+                {creds.displayLine} • {advisor.experience_years || 5}+ yrs practice
               </p>
             )}
           </div>
         </div>
+
+        {/* Multi-Segment Pills (when mentor has segments beyond primary) */}
+        {activeSegments.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">
+            {activeSegments.slice(0, 3).map((ms, i) => (
+              <span
+                key={ms.slug || i}
+                className="text-[10px] text-[#9a9a9a] px-2 py-0.5 rounded-full border border-white/5 bg-white/[0.02]"
+              >
+                {ms.name}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Bio summary excerpt */}
         <p className="text-xs sm:text-sm text-[#bdbdbd] font-light leading-relaxed line-clamp-3">
@@ -109,7 +144,7 @@ export const AdvisorEditorialCard: React.FC<AdvisorEditorialCardProps> = ({
               </span>
             </div>
             <Link
-              to={`/gigs/${primaryGig.id}`}
+              to={`/mentor/${advisor.id}`}
               className="text-sm font-medium text-white hover:text-[#8052ff] transition-colors block line-clamp-1"
             >
               {primaryGig.title}
@@ -132,20 +167,18 @@ export const AdvisorEditorialCard: React.FC<AdvisorEditorialCardProps> = ({
       {/* Action Footer */}
       <div className="pt-2 flex items-center gap-3">
         <Link
-          to={`/advisors/${advisor.id}`}
+          to={`/mentor/${advisor.id}`}
           className="flex-1 py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-full text-xs font-semibold uppercase tracking-wider text-center transition-all"
         >
           View Profile
         </Link>
-        {primaryGig && (
-          <Link
-            to={`/gigs/${primaryGig.id}`}
-            className="flex-1 py-3 px-4 bg-[#8052ff] hover:bg-[#6c3df0] text-white rounded-full text-xs font-semibold uppercase tracking-wider text-center flex items-center justify-center gap-1.5 transition-all shadow-md shadow-[#8052ff]/20"
-          >
-            <span>Book Session</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        )}
+        <Link
+          to={`/gigs/${primaryGig?.id || advisor.id}`}
+          className="flex-1 py-3 px-4 bg-[#8052ff] hover:bg-[#6c3df0] text-white rounded-full text-xs font-semibold uppercase tracking-wider text-center flex items-center justify-center gap-1.5 transition-all shadow-md shadow-[#8052ff]/20"
+        >
+          <span>Book Session</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
       </div>
     </div>
   );

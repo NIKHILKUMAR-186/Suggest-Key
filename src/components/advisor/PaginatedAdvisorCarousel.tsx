@@ -27,7 +27,9 @@ import { AdvisorDetail } from '../../domains/advisor/AdvisorService';
 import { AdvisorService } from '../../domains/advisor/AdvisorService';
 import { AdvisorySegment } from '../../domains/segment/SegmentTypes';
 import { SegmentService } from '../../domains/segment/SegmentService';
-import { Gig } from '../../lib/supabase/types';
+import { Gig, Offering } from '../../lib/supabase/types';
+
+type IconComponent = React.FC<{ className?: string; style?: React.CSSProperties }>;
 
 interface PaginatedAdvisorCarouselProps {
   segment?: string;
@@ -40,7 +42,7 @@ interface PaginatedAdvisorCarouselProps {
   className?: string;
 }
 
-const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
+const ICON_MAP: Record<string, IconComponent> = {
   Heart,
   Briefcase,
   Brain,
@@ -371,8 +373,11 @@ export const PaginatedAdvisorCarousel: React.FC<PaginatedAdvisorCarouselProps> =
         >
           {advisors.map((advisor) => {
             const primaryGig = advisor.gigs && advisor.gigs.length > 0 ? advisor.gigs[0] : null;
-            const price = primaryGig ? primaryGig.price_inr : 4500;
-            const duration = primaryGig ? primaryGig.duration_minutes : 45;
+            const primaryOffering = (advisor as any).offerings && (advisor as any).offerings.length > 0
+              ? ((advisor as any).offerings as Offering[]).find((o) => o.is_available) || (advisor as any).offerings[0]
+              : null;
+            const price = primaryOffering ? primaryOffering.price_inr : primaryGig ? primaryGig.price_inr : 4500;
+            const duration = primaryOffering ? primaryOffering.duration_minutes : primaryGig ? primaryGig.duration_minutes : 45;
 
             return (
               <div
@@ -386,7 +391,7 @@ export const PaginatedAdvisorCarousel: React.FC<PaginatedAdvisorCarouselProps> =
                   {/* Top Profile Bar */}
                   <div className="flex items-start justify-between gap-3">
                     <Link
-                      to={`/advisors/${advisor.id}`}
+                      to={`/mentor/${advisor.id}`}
                       className="flex items-center gap-3.5 group/profile"
                     >
                       <div className="relative">
@@ -471,10 +476,10 @@ export const PaginatedAdvisorCarousel: React.FC<PaginatedAdvisorCarouselProps> =
 
                   <div className="flex items-center gap-2">
                     <Link
-                      to={`/advisors/${advisor.id}`}
+                      to={`/mentor/${advisor.id}`}
                       className="px-3 py-1.5 rounded-full border border-white/10 hover:border-white/20 text-xs text-[#9a9a9a] hover:text-white transition-colors"
                     >
-                      Dossier
+                      View Profile
                     </Link>
 
                     {primaryGig ? (
@@ -490,7 +495,7 @@ export const PaginatedAdvisorCarousel: React.FC<PaginatedAdvisorCarouselProps> =
                       </button>
                     ) : (
                       <Link
-                        to={`/advisors/${advisor.id}`}
+                        to={`/mentor/${advisor.id}`}
                         className="px-4 py-1.5 rounded-full text-white text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md"
                         style={{
                           backgroundColor: accent,

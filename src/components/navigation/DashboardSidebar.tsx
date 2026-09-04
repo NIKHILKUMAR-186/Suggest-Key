@@ -37,13 +37,12 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   });
 
   useEffect(() => {
-    if (config.role !== 'seeker') return;
+    if (config.role !== 'seeker' || !user?.id) return;
     async function loadUnreadCount() {
       try {
-        const userId = user?.id || 'usr-seeker-01';
-        const channels = await MessagingService.getChannels(userId, 'seeker');
+        const channels = await MessagingService.getChannels(user.id, 'seeker');
         const count = channels.reduce((sum, ch) => sum + (ch.unread_count || 0), 0);
-        setUnreadMessagesCount(count > 0 ? count : 1);
+        setUnreadMessagesCount(count > 0 ? count : 0);
       } catch (err) {
         console.error('Error fetching unread count:', err);
       }

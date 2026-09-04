@@ -16,16 +16,57 @@ export interface ChatChannel {
   id: string;
   booking_id?: string;
   mentor_id: string;
-  mentor_name?: string;
+  mentor_name: string;
   mentor_avatar?: string;
   mentor_headline?: string;
   seeker_id: string;
-  seeker_name?: string;
+  seeker_name: string;
   seeker_avatar?: string;
   last_message?: string;
   last_message_at?: string;
   unread_count: number;
   created_at: string;
+}
+
+interface ProfileBrief {
+  id: string;
+  full_name?: string;
+  avatar_url?: string | null;
+}
+
+interface MentorBrief {
+  id: string;
+  headline?: string;
+  profile?: ProfileBrief[];
+}
+
+interface MessageBrief {
+  id: string;
+  content: string;
+  created_at: string;
+  sender_id?: string;
+}
+
+interface ChannelRelationRow {
+  id: string;
+  booking_id?: string;
+  seeker_id?: string;
+  mentor_id?: string;
+  last_message_at?: string;
+  created_at: string;
+  seeker?: ProfileBrief[];
+  mentor?: MentorBrief[];
+  messages?: MessageBrief[];
+}
+
+interface SendMessageResult {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string;
+  attachments?: { name: string; url: string; size?: string }[];
+  created_at: string;
+  sender?: ProfileBrief[];
 }
 
 export class MessagingService {
@@ -56,7 +97,7 @@ export class MessagingService {
           ),
           messages:messages(id, content, created_at, sender_id)
         `)
-        .order('last_message_at', { ascending: false, nullsLast: true });
+        .order('last_message_at', { ascending: false, nullsFirst: false });
 
       if (role === 'seeker') {
         query = query.eq('seeker_id', userId);
@@ -72,26 +113,28 @@ export class MessagingService {
         return [];
       }
 
-      return (data || []).map((conv: any) => {
-        const lastMessage = conv.messages?.length > 0
+      const conversations = (data || []) as ChannelRelationRow[];
+      return conversations.map((conv) => {
+        const lastMessage = conv.messages && conv.messages.length > 0
           ? conv.messages[conv.messages.length - 1]
           : null;
 
-        const mentorProfile = conv.mentor?.profile || {};
-        const seekerProfile = conv.seeker || {};
+        const mentor = conv.mentor?.[0];
+        const mentorProfile = mentor?.profile?.[0];
+        const seeker = conv.seeker?.[0];
 
         return {
           id: conv.id,
-          booking_id: conv.booking_id,
-          mentor_id: conv.mentor_id,
-          mentor_name: mentorProfile.full_name || 'Advisor',
-          mentor_avatar: mentorProfile.avatar_url,
-          mentor_headline: conv.mentor?.headline,
-          seeker_id: conv.seeker_id,
-          seeker_name: seekerProfile.full_name || 'Seeker',
-          seeker_avatar: seekerProfile.avatar_url,
-          last_message: lastMessage?.content,
-          last_message_at: lastMessage?.created_at || conv.last_message_at,
+          booking_id: conv.booking_id || undefined,
+          mentor_id: conv.mentor_id || '',
+          mentor_name: mentorProfile?.full_name || 'Advisor',
+          mentor_avatar: mentorProfile?.avatar_url || undefined,
+          mentor_headline: mentor?.headline || undefined,
+          seeker_id: conv.seeker_id || '',
+          seeker_name: seeker?.full_name || 'Seeker',
+          seeker_avatar: seeker?.avatar_url || undefined,
+          last_message: lastMessage?.content || undefined,
+          last_message_at: lastMessage?.created_at || conv.last_message_at || undefined,
           unread_count: 0, // TODO: Implement unread count tracking
           created_at: conv.created_at,
         };
@@ -144,35 +187,38 @@ export class MessagingService {
         return null;
       }
 
+      const conversation = data as unknown as ChannelRelationRow;
+
       // Check participant authorization
       if (requestingUserId && role && role !== 'admin') {
-        const isParticipant = data.seeker_id === requestingUserId || data.mentor_id === requestingUserId;
+        const isParticipant = conversation.seeker_id === requestingUserId || conversation.mentor_id === requestingUserId;
         if (!isParticipant) {
           return null;
         }
       }
 
-      const lastMessage = data.messages?.length > 0
-        ? data.messages[data.messages.length - 1]
+      const lastMessage = conversation.messages && conversation.messages.length > 0
+        ? conversation.messages[conversation.messages.length - 1]
         : null;
 
-      const mentorProfile = data.mentor?.profile || {};
-      const seekerProfile = data.seeker || {};
+      const mentor = conversation.mentor?.[0];
+      const mentorProfile = mentor?.profile?.[0];
+      const seeker = conversation.seeker?.[0];
 
       return {
-        id: data.id,
-        booking_id: data.booking_id,
-        mentor_id: data.mentor_id,
-        mentor_name: mentorProfile.full_name || 'Advisor',
-        mentor_avatar: mentorProfile.avatar_url,
-        mentor_headline: data.mentor?.headline,
-        seeker_id: data.seeker_id,
-        seeker_name: seekerProfile.full_name || 'Seeker',
-        seeker_avatar: seekerProfile.avatar_url,
-        last_message: lastMessage?.content,
-        last_message_at: lastMessage?.created_at || data.last_message_at,
+        id: conversation.id,
+        booking_id: conversation.booking_id || undefined,
+        mentor_id: conversation.mentor_id || '',
+        mentor_name: mentorProfile?.full_name || 'Advisor',
+        mentor_avatar: mentorProfile?.avatar_url || undefined,
+        mentor_headline: mentor?.headline || undefined,
+        seeker_id: conversation.seeker_id || '',
+        seeker_name: seeker?.full_name || 'Seeker',
+        seeker_avatar: seeker?.avatar_url || undefined,
+        last_message: lastMessage?.content || undefined,
+        last_message_at: lastMessage?.created_at || conversation.last_message_at || undefined,
         unread_count: 0,
-        created_at: data.created_at,
+        created_at: conversation.created_at,
       };
     } catch (err) {
       console.error('Error in getChannelById:', err);
@@ -209,14 +255,23 @@ export class MessagingService {
         return [];
       }
 
-      return (data || []).map((msg: any) => ({
+      const messages = (data || []) as Array<{
+        id: string;
+        conversation_id: string;
+        sender_id: string;
+        content: string;
+        attachments?: unknown;
+        created_at: string;
+        sender?: ProfileBrief[];
+      }>;
+      return messages.map((msg) => ({
         id: msg.id,
         conversation_id: msg.conversation_id,
         sender_id: msg.sender_id,
-        sender_name: msg.sender?.full_name,
-        sender_avatar: msg.sender?.avatar_url,
+        sender_name: msg.sender?.[0]?.full_name || undefined,
+        sender_avatar: msg.sender?.[0]?.avatar_url || undefined,
         content: msg.content,
-        attachments: msg.attachments || [],
+        attachments: Array.isArray(msg.attachments) ? msg.attachments : [],
         created_at: msg.created_at,
       }));
     } catch (err) {
@@ -268,21 +323,23 @@ export class MessagingService {
         return null;
       }
 
+      const result = messageData as unknown as SendMessageResult;
+
       // Update conversation's last_message_at
       await supabase
         .from('conversations')
-        .update({ last_message_at: messageData.created_at })
+        .update({ last_message_at: result.created_at })
         .eq('id', params.conversationId);
 
       return {
-        id: messageData.id,
-        conversation_id: messageData.conversation_id,
-        sender_id: messageData.sender_id,
-        sender_name: messageData.sender?.full_name,
-        sender_avatar: messageData.sender?.avatar_url,
-        content: messageData.content,
-        attachments: messageData.attachments || [],
-        created_at: messageData.created_at,
+        id: result.id,
+        conversation_id: result.conversation_id,
+        sender_id: result.sender_id,
+        sender_name: result.sender?.[0]?.full_name || undefined,
+        sender_avatar: result.sender?.[0]?.avatar_url || undefined,
+        content: result.content,
+        attachments: Array.isArray(result.attachments) ? result.attachments : [],
+        created_at: result.created_at,
       };
     } catch (err) {
       console.error('Error in sendMessage:', err);
@@ -313,13 +370,13 @@ export class MessagingService {
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          const msg = payload.new as any;
+          const msg = payload.new as { id: string; conversation_id: string; sender_id: string; content: string; attachments?: unknown; created_at: string };
           callback({
             id: msg.id,
             conversation_id: msg.conversation_id,
             sender_id: msg.sender_id,
             content: msg.content,
-            attachments: msg.attachments || [],
+            attachments: Array.isArray(msg.attachments) ? msg.attachments : [],
             created_at: msg.created_at,
           });
         }

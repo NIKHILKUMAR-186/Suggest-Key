@@ -13,7 +13,10 @@
 INSERT INTO public.profiles (id, email, full_name, avatar_url, role, is_anonymous_enabled, anonymous_name, is_demo, created_at, updated_at) VALUES
 ('11111111-1111-1111-1111-111111111111', 'alex.rivera@example.com', 'Alex Rivera', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80', 'seeker', true, 'Seeker #884', true, '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z'),
 ('22222222-2222-2222-2222-222222222222', 'evelyn.vasquez@suggestkey.com', 'Dr. Evelyn Vasquez', 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&auto=format&fit=crop&q=80', 'mentor', false, null, true, '2024-11-01T08:00:00Z', '2025-02-01T12:00:00Z'),
-('33333333-3333-3333-3333-333333333333', 'operator@suggestkey.com', 'Platform Administrator', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80', 'admin', false, null, true, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z'),
+-- NOTE: The master admin is created by 20260903_bootstrap_admin.sql using
+-- Supabase service-role credentials. Do NOT seed a profile row here for
+-- the admin email — that row is created alongside the auth.users entry
+-- so the auth.users.id <-> profiles.id link is correct.
 ('44444444-4444-4444-4444-444444444444', 'marcus.thorne@suggestkey.com', 'Marcus Thorne', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80', 'mentor', false, null, true, '2024-10-15T09:00:00Z', '2025-02-05T15:00:00Z'),
 ('55555555-5555-5555-5555-555555555555', 'sarah.jenkins@suggestkey.com', 'Sarah Jenkins', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80', 'mentor', false, null, true, '2024-09-10T12:00:00Z', '2025-02-10T16:00:00Z'),
 ('66666666-6666-6666-6666-666666666666', 'alistair.chen@suggestkey.com', 'Dr. Alistair Chen, LMFT', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80', 'mentor', false, null, true, '2024-10-12T08:00:00Z', '2025-02-01T12:00:00Z'),

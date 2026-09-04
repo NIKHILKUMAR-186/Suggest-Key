@@ -19,7 +19,10 @@ import {
 
 export const SignupPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const initialRole = (searchParams.get('role') as UserRole) || 'seeker';
+  const requestedRole = (searchParams.get('role') as UserRole) || 'seeker';
+  // Admin role can NEVER be selected from the public signup page, regardless
+  // of any `?role=` URL parameter. Only existing admins may create admins.
+  const initialRole: UserRole = requestedRole === 'admin' ? 'seeker' : requestedRole;
 
   const { signUp, isConfigured } = useAuth();
   const navigate = useNavigate();

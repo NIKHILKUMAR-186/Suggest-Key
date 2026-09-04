@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../domains/auth/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { AdvisorDetail } from '../../domains/advisor/AdvisorService';
-import { Gig } from '../../lib/supabase/types';
+import { Offering } from '../../lib/supabase/types';
 import { AvailabilityService, TimeSlot } from '../../domains/booking/AvailabilityService';
-import { BookingService, EnrichedBooking } from '../../domains/booking/BookingService';
+import { BookingRequestService } from '../../domains/booking/BookingRequestService';
 import { PaymentService } from '../../domains/payment/PaymentService';
 import { MessagingService } from '../../domains/messaging/MessagingService';
+import { BookingRequestWithDetails } from '../../domains/booking/BookingRequestService';
 import {
   Calendar,
   Clock,
@@ -23,25 +24,27 @@ import {
   Smartphone,
   Building2,
   RefreshCw,
+  Video,
+  MessageSquare,
 } from 'lucide-react';
 
 interface BookingCheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   advisor: AdvisorDetail;
-  gig: Gig;
+  offering: Offering;
   initialDate?: string;
   initialSlot?: string;
   initialNotes?: string;
   initialIsAnonymous?: boolean;
-  onBookingSuccess?: (booking: EnrichedBooking) => void;
+  onBookingSuccess?: (bookingRequest: BookingRequestWithDetails) => void;
 }
 
 export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
   isOpen,
   onClose,
   advisor,
-  gig,
+  offering,
   initialDate,
   initialSlot,
   initialNotes,
@@ -52,10 +55,7 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Wizard Step: 1 = Slot & Context, 2 = Payment Gateway, 3 = Confirmation
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-
-  // Scheduling State
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [selectedDate, setSelectedDate] = useState<string>(
     initialDate || new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0]
   );
@@ -63,28 +63,26 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [loadingSlots, setLoadingSlots] = useState<boolean>(false);
   const [seekerNotes, setSeekerNotes] = useState<string>(initialNotes || '');
-  const [isAnonymous, setIsAnonymous] = useState<boolean>(initialIsAnonymous ?? profile?.is_anonymous_enabled ?? false);
+  const [isAnonymous, setIsAnonymous] = useState<boolean>(
+    initialIsAnonymous ?? profile?.is_anonymous_enabled ?? false
+  );
 
-  // Concurrency & Lock State
   const [lockId, setLockId] = useState<string | null>(null);
-  const [lockExpiresIn, setLockExpiresIn] = useState<number>(300); // 5 mins in seconds
+  const [lockExpiresAt, setLockExpiresAt] = useState<number>(0);
+  const [lockExpiresIn, setLockExpiresIn] = useState<number>(300);
   const [slotConflictError, setSlotConflictError] = useState<string | null>(null);
 
-  // Payment Gateway State
   const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'netbanking'>('card');
-  const [upiId, setUpiId] = useState<string>('alex.rivera@oksbi');
-  const [cardNumber, setCardNumber] = useState<string>('4532 •••• •••• 8912');
-  const [cardExpiry, setCardExpiry] = useState<string>('08/29');
-  const [cardCvv, setCardCvv] = useState<string>('419');
+  const [upiId, setUpiId] = useState<string>('');
+  const [cardNumber, setCardNumber] = useState<string>('');
+  const [cardExpiry, setCardExpiry] = useState<string>('');
+  const [cardCvv, setCardCvv] = useState<string>('');
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
 
-  // Completed Booking
-  const [confirmedBooking, setConfirmedBooking] = useState<EnrichedBooking | null>(null);
+  const [confirmedRequest, setConfirmedRequest] = useState<BookingRequestWithDetails | null>(null);
 
-  // Calculate Fee Breakdown
-  const breakdown = PaymentService.calculateBreakdown(gig.price_inr);
+  const breakdown = PaymentService.calculateBreakdown(offering.price_inr);
 
-  // Generate 7-day selector dates
   const next7Days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i + 1);
@@ -96,65 +94,61 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
     };
   });
 
-  // Fetch slots whenever selectedDate changes
   useEffect(() => {
     async function loadSlots() {
       if (!isOpen) return;
       setLoadingSlots(true);
       setSlotConflictError(null);
 
-      const allBookings = await BookingService.getMentorBookings(advisor.id);
-      const targetDate = new Date(selectedDate);
+      try {
+        const targetDate = new Date(selectedDate);
+        const slots = await AvailabilityService.getAvailableSlots({
+          mentorId: advisor.id,
+          date: targetDate,
+          durationMinutes: offering.duration_minutes || 45,
+          currentSeekerId: profile?.id,
+        });
+        setAvailableSlots(slots);
 
-      const slots = AvailabilityService.getAvailableSlots({
-        mentorId: advisor.id,
-        date: targetDate,
-        durationMinutes: gig.duration_minutes || 45,
-        existingBookings: allBookings,
-        currentSeekerId: profile?.id,
-      });
-
-      setAvailableSlots(slots);
-      setLoadingSlots(false);
-
-      // Auto-select first available slot if previous is invalid
-      const available = slots.find((s) => s.isAvailable);
-      if (available) {
-        setSelectedSlot(available);
-      } else {
-        setSelectedSlot(null);
+        const available = slots.find((s) => s.isAvailable);
+        if (available && !initialSlot) {
+          setSelectedSlot(available);
+        } else {
+          setSelectedSlot(null);
+        }
+      } catch (err) {
+        console.error('Error loading slots:', err);
+        setSlotConflictError('Unable to load availability right now.');
+      } finally {
+        setLoadingSlots(false);
       }
     }
 
     loadSlots();
-  }, [isOpen, selectedDate, advisor.id, gig.duration_minutes, profile?.id]);
+  }, [isOpen, selectedDate, advisor.id, offering.duration_minutes, profile?.id]);
 
-  // Lock countdown timer
   useEffect(() => {
     if (!lockId || step !== 2) return;
 
     const timer = setInterval(() => {
-      setLockExpiresIn((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          // Lock expired, release and return to step 1
-          if (lockId) AvailabilityService.releaseLock(lockId);
-          setLockId(null);
-          setStep(1);
-          setSlotConflictError('Your 5-minute reservation timer expired. Please select your time slot again.');
-          return 300;
-        }
-        return prev - 1;
-      });
+      const remaining = Math.max(0, Math.floor((lockExpiresAt - Date.now()) / 1000));
+      setLockExpiresIn(remaining);
+      if (remaining <= 0) {
+        clearInterval(timer);
+        AvailabilityService.releaseLock(lockId).catch(() => undefined);
+        setLockId(null);
+        setStep(1);
+        setSlotConflictError('Your 5-minute reservation expired. Please re-select a slot.');
+      }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [lockId, step]);
+  }, [lockId, step, lockExpiresAt]);
 
   if (!isOpen) return null;
 
-  const handleProceedToPayment = () => {
-    if (!user) {
+  const handleProceedToPayment = async () => {
+    if (!user || !profile) {
       navigate('/login');
       return;
     }
@@ -164,95 +158,112 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
       return;
     }
 
-    // Acquire atomic temporary lock
-    const lockResult = AvailabilityService.acquireLock({
+    if (profile.id === advisor.id) {
+      toast({ title: 'Not Allowed', description: 'You cannot book a session with yourself.' });
+      return;
+    }
+
+    const lockResult = await AvailabilityService.acquireLock({
       mentorId: advisor.id,
       startTime: selectedSlot.startTime,
       endTime: selectedSlot.endTime,
-      seekerId: profile?.id || 'usr-seeker-01',
+      seekerId: profile.id,
     });
 
     if (!lockResult.success) {
-      setSlotConflictError('This time slot was just selected by another client. Please choose another time.');
+      setSlotConflictError(
+        lockResult.error === 'SLOT_CONFLICT'
+          ? 'This time slot was just taken by another client. Please choose another time.'
+          : 'Could not reserve this slot. Please try another.'
+      );
       return;
     }
 
     setLockId(lockResult.lockId || null);
+    setLockExpiresAt(lockResult.expiresAt ? new Date(lockResult.expiresAt).getTime() : Date.now() + 5 * 60 * 1000);
     setLockExpiresIn(300);
     setSlotConflictError(null);
     setStep(2);
   };
 
-  const handleExecuteAtomicBooking = async () => {
-    if (!selectedSlot) return;
+  const handleExecuteBookingRequest = async () => {
+    if (!selectedSlot || !profile) return;
 
     setIsProcessingPayment(true);
     setSlotConflictError(null);
 
-    // Simulate payment capture
-    const paymentOrder = await PaymentService.createOrder({
-      amountInr: gig.price_inr,
-    });
-
-    // Execute atomic booking creation with conflict detection
-    const result = await BookingService.createAtomicBooking({
-      seekerId: profile?.id || 'usr-seeker-01',
-      seekerName: profile?.full_name || 'Alex Rivera',
-      seekerEmail: profile?.email || 'alex.rivera@example.com',
-      seekerAvatar: profile?.avatar_url,
-      mentorId: advisor.id,
-      gigId: gig.id,
-      startTime: selectedSlot.startTime,
-      endTime: selectedSlot.endTime,
-      notes: seekerNotes,
-      isAnonymous,
-      lockId: lockId || undefined,
-    });
-
-    if (!result.success || !result.booking) {
+    // Step 3 — Review (in-modal confirmation of booking summary)
+    if (step === 2) {
+      setStep(3);
       setIsProcessingPayment(false);
-      if (lockId) AvailabilityService.releaseLock(lockId);
-      setLockId(null);
-      setStep(1);
-      setSlotConflictError(result.message || 'Concurrency conflict: slot is no longer available.');
       return;
     }
 
-    // Payment captured into Escrow
+    // Step 4 — Authorize payment (sandbox) and submit booking request
+    const paymentOrder = await PaymentService.createOrder({
+      amountInr: offering.price_inr,
+    });
+
+    const result = await BookingRequestService.createBookingRequest({
+      offeringId: offering.id,
+      startTime: selectedSlot.startTime,
+      endTime: selectedSlot.endTime,
+      message: seekerNotes || undefined,
+      isAnonymous,
+    });
+
+    if (!result.success || !result.bookingRequestId) {
+      setIsProcessingPayment(false);
+      setSlotConflictError(result.message || 'Booking could not be submitted. Please try again.');
+      if (lockId) {
+        await AvailabilityService.releaseLock(lockId).catch(() => undefined);
+      }
+      setLockId(null);
+      setStep(2);
+      return;
+    }
+
+    // Capture payment ledger entry (sandbox)
     await PaymentService.capturePayment({
       orderId: paymentOrder.id,
       paymentMethod,
-      bookingId: result.booking.id,
+      bookingId: result.bookingRequestId,
       mentorId: advisor.id,
-      seekerId: profile?.id || 'usr-seeker-01',
+      seekerId: profile.id,
     });
 
-    // Auto create / update direct chat message channel with system notification
-    const channelId = `ch-${result.booking.id}`;
-    await MessagingService.sendMessage({
-      channelId,
-      senderId: 'system',
-      senderName: 'Suggest Key Platform',
-      senderRole: 'mentor',
-      content: `Session confirmed for ${new Date(result.booking.start_time).toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      })} at ${new Date(result.booking.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}. Escrow deposit of ₹${(result.booking.amount_inr || 0).toLocaleString()} held safely.`,
-    });
+    const full = await BookingRequestService.getBookingRequestById(result.bookingRequestId);
+
+    if (full) {
+      const conversationId = `ch-${full.id}`;
+      await MessagingService.sendMessage({
+        conversationId,
+        senderId: 'system',
+        senderName: 'Suggest Key Platform',
+        senderRole: 'mentor',
+        content: `Booking request submitted for ${new Date(full.proposed_start_time).toLocaleDateString('en-US', {
+          weekday: 'short', month: 'short', day: 'numeric',
+        })} at ${new Date(full.proposed_start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}. Funds held in escrow pending mentor approval.`,
+      });
+    }
 
     setIsProcessingPayment(false);
-    setConfirmedBooking(result.booking);
-    setStep(3);
+    setConfirmedRequest(full);
+    setStep(4);
 
-    if (onBookingSuccess) {
-      onBookingSuccess(result.booking);
+    if (lockId) {
+      await AvailabilityService.releaseLock(lockId).catch(() => undefined);
+    }
+    setLockId(null);
+
+    if (onBookingSuccess && full) {
+      onBookingSuccess(full);
     }
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
     if (lockId) {
-      AvailabilityService.releaseLock(lockId);
+      await AvailabilityService.releaseLock(lockId).catch(() => undefined);
     }
     setLockId(null);
     setStep(1);
@@ -267,8 +278,7 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="relative w-full max-w-2xl bg-[#0d0d0d] border border-white/15 rounded-[28px] shadow-2xl overflow-hidden text-white max-h-[90vh] flex flex-col">
-        {/* Header Strip */}
+      <div className="relative w-full max-w-2xl bg-[#0d0d0d] border border-white/15 rounded-[28px] shadow-2xl overflow-hidden text-white max-h-[90] flex flex-col" style={{maxHeight: '90vh'}}>
         <div className="p-6 border-b border-white/10 flex items-center justify-between bg-black/40">
           <div className="flex items-center gap-3">
             <img
@@ -282,10 +292,10 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
                   1:1 Advisory Booking
                 </span>
                 <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-[#15846e]/20 text-[#15846e] border border-[#15846e]/30">
-                  Atomic Safe
+                  Step {step} of 4
                 </span>
               </div>
-              <h2 className="text-base font-medium text-white">{gig.title}</h2>
+              <h2 className="text-base font-medium text-white">{offering.title}</h2>
             </div>
           </div>
 
@@ -297,22 +307,20 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Body */}
         <div className="p-6 md:p-8 overflow-y-auto space-y-6 flex-1">
-          {/* STEP 1: REAL-TIME SLOT SELECTION & INTAKE CONTEXT */}
+          {slotConflictError && step <= 2 && (
+            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-3">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold block">Schedule Collision</span>
+                <span>{slotConflictError}</span>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 1: DATE + SLOT */}
           {step === 1 && (
             <div className="space-y-6">
-              {slotConflictError && (
-                <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-3">
-                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-semibold block">Schedule Collision</span>
-                    <span>{slotConflictError}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Date Selection Strip */}
               <div className="space-y-2">
                 <label className="text-xs uppercase tracking-wider text-[#9a9a9a] font-medium block">
                   1. Select Scheduled Date
@@ -339,14 +347,13 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
                 </div>
               </div>
 
-              {/* Real-time Slots Grid */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs uppercase tracking-wider text-[#9a9a9a] font-medium">
                     2. Select Verified Time Slot (IST)
                   </label>
                   <span className="text-[11px] text-[#9a9a9a] flex items-center gap-1">
-                    <Lock className="w-3 h-3 text-[#15846e]" /> Real-time server validated
+                    <Lock className="w-3 h-3 text-[#15846e]" /> Server-validated availability
                   </span>
                 </div>
 
@@ -398,7 +405,6 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
                 )}
               </div>
 
-              {/* Problem Intent Note */}
               <div className="space-y-2">
                 <label className="text-xs uppercase tracking-wider text-[#9a9a9a] font-medium block">
                   3. Session Problem Context & Intake Goal
@@ -412,7 +418,6 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
                 />
               </div>
 
-              {/* Anonymity Shield Option */}
               <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 flex items-center justify-between">
                 <div className="space-y-0.5">
                   <div className="text-xs font-medium text-white flex items-center gap-1.5">
@@ -433,150 +438,100 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
             </div>
           )}
 
-          {/* STEP 2: ESCROW PAYMENT GATEWAY (RAZORPAY ARCHITECTURE) */}
+          {/* STEP 2: PAYMENT METHOD */}
           {step === 2 && (
             <div className="space-y-6">
-              {/* Lock Expiry Badge */}
               <div className="p-4 rounded-2xl bg-[#ffb829]/10 border border-[#ffb829]/30 flex items-center justify-between text-xs text-[#ffb829]">
                 <div className="flex items-center gap-2">
                   <Lock className="w-4 h-4" />
-                  <span className="font-semibold">Slot Reserved Atomically</span>
+                  <span className="font-semibold">Slot Reserved (server-validated)</span>
                 </div>
                 <span className="font-mono text-sm font-bold">{formatSeconds(lockExpiresIn)} remaining</span>
               </div>
 
-              {/* Order Breakdown Card */}
               <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.02] space-y-3">
                 <div className="flex items-center justify-between text-xs pb-3 border-b border-white/5">
-                  <span className="text-[#9a9a9a]">Consultation Rate (100% Escrow)</span>
+                  <span className="text-[#9a9a9a]">Consultation Rate</span>
                   <span className="text-white font-medium">₹{(breakdown.grossAmount || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs pb-3 border-b border-white/5 text-[#9a9a9a]">
-                  <span>Advisor Payout (85% upon completion)</span>
+                  <span>Advisor Payout (85%)</span>
                   <span>₹{(breakdown.mentorPayout || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs pb-3 border-b border-white/5 text-[#9a9a9a]">
-                  <span>Suggest Key Platform Fee (15%)</span>
+                  <span>Platform Fee (15%)</span>
                   <span>₹{(breakdown.platformFee || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm pt-1">
-                  <span className="font-medium text-white">Total Escrow Deposit</span>
+                  <span className="font-medium text-white">Total Held in Escrow</span>
                   <span className="text-xl font-bold text-white">₹{(breakdown.grossAmount || 0).toLocaleString()}</span>
                 </div>
               </div>
 
-              {/* Payment Methods */}
               <div className="space-y-3">
                 <label className="text-xs uppercase tracking-wider text-[#9a9a9a] font-medium block">
-                  Select Payment Method (Sandbox Gateway)
+                  Select Payment Method
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('card')}
-                    className={`p-3 rounded-2xl border text-center text-xs flex flex-col items-center gap-1.5 transition-all ${
-                      paymentMethod === 'card'
-                        ? 'border-[#8052ff] bg-[#8052ff]/20 text-white font-semibold'
-                        : 'border-white/10 bg-white/5 text-[#9a9a9a] hover:text-white'
-                    }`}
-                  >
-                    <CreditCard className="w-4 h-4" />
-                    <span>Card / Debit</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('upi')}
-                    className={`p-3 rounded-2xl border text-center text-xs flex flex-col items-center gap-1.5 transition-all ${
-                      paymentMethod === 'upi'
-                        ? 'border-[#8052ff] bg-[#8052ff]/20 text-white font-semibold'
-                        : 'border-white/10 bg-white/5 text-[#9a9a9a] hover:text-white'
-                    }`}
-                  >
-                    <Smartphone className="w-4 h-4" />
-                    <span>Instant UPI</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('netbanking')}
-                    className={`p-3 rounded-2xl border text-center text-xs flex flex-col items-center gap-1.5 transition-all ${
-                      paymentMethod === 'netbanking'
-                        ? 'border-[#8052ff] bg-[#8052ff]/20 text-white font-semibold'
-                        : 'border-white/10 bg-white/5 text-[#9a9a9a] hover:text-white'
-                    }`}
-                  >
-                    <Building2 className="w-4 h-4" />
-                    <span>Net Banking</span>
-                  </button>
+                  {(['card', 'upi', 'netbanking'] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setPaymentMethod(m)}
+                      className={`p-3 rounded-2xl border text-center text-xs flex flex-col items-center gap-1.5 transition-all ${
+                        paymentMethod === m
+                          ? 'border-[#8052ff] bg-[#8052ff]/20 text-white font-semibold'
+                          : 'border-white/10 bg-white/5 text-[#9a9a9a] hover:text-white'
+                      }`}
+                    >
+                      {m === 'card' && <CreditCard className="w-4 h-4" />}
+                      {m === 'upi' && <Smartphone className="w-4 h-4" />}
+                      {m === 'netbanking' && <Building2 className="w-4 h-4" />}
+                      <span>{m === 'card' ? 'Card / Debit' : m === 'upi' ? 'UPI' : 'Net Banking'}</span>
+                    </button>
+                  ))}
                 </div>
-
-                {/* Method Input Simulation */}
-                {paymentMethod === 'card' && (
-                  <div className="p-4 rounded-2xl border border-white/10 bg-black/40 space-y-3">
-                    <div className="space-y-1">
-                      <span className="text-[10px] text-[#9a9a9a] uppercase">Card Number</span>
-                      <input
-                        type="text"
-                        value={cardNumber}
-                        onChange={(e) => setCardNumber(e.target.value)}
-                        className="w-full p-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-mono"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-[#9a9a9a] uppercase">Expiry</span>
-                        <input
-                          type="text"
-                          value={cardExpiry}
-                          onChange={(e) => setCardExpiry(e.target.value)}
-                          className="w-full p-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-mono"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-[#9a9a9a] uppercase">CVV</span>
-                        <input
-                          type="password"
-                          value={cardCvv}
-                          onChange={(e) => setCardCvv(e.target.value)}
-                          className="w-full p-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-mono"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {paymentMethod === 'upi' && (
-                  <div className="p-4 rounded-2xl border border-white/10 bg-black/40 space-y-2">
-                    <span className="text-[10px] text-[#9a9a9a] uppercase">Virtual Payment Address (VPA)</span>
-                    <input
-                      type="text"
-                      value={upiId}
-                      onChange={(e) => setUpiId(e.target.value)}
-                      className="w-full p-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-mono"
-                    />
-                  </div>
-                )}
-
-                {paymentMethod === 'netbanking' && (
-                  <div className="p-4 rounded-2xl border border-white/10 bg-black/40 text-xs text-[#9a9a9a]">
-                    Sandbox auto-clears via HDFC / ICICI / SBI direct settlement router.
-                  </div>
-                )}
               </div>
 
-              {/* Escrow Guarantee Statement */}
               <div className="p-4 rounded-2xl bg-[#15846e]/10 border border-[#15846e]/30 flex items-start gap-2.5 text-xs text-[#15846e]">
                 <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
                 <p className="leading-relaxed">
-                  Funds are locked in Suggest Key Escrow and only released to the mentor after the 1:1 call concludes successfully. Cancel anytime up to 24 hours prior for a 100% refund.
+                  Funds are secured in escrow until the mentor confirms your request. Cancellation is allowed any time before mentor acceptance.
                 </p>
               </div>
             </div>
           )}
 
-          {/* STEP 3: SUCCESS CONFIRMATION */}
-          {step === 3 && confirmedBooking && (
+          {/* STEP 3: REVIEW */}
+          {step === 3 && selectedSlot && (
+            <div className="space-y-4">
+              <h3 className="text-base font-medium text-white">Review Booking Request</h3>
+              <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.02] space-y-2.5 text-xs">
+                <Row label="Mentor" value={advisor.full_name || ''} />
+                <Row label="Offering" value={offering.title} />
+                <Row
+                  label="Date"
+                  value={new Date(selectedSlot.startTime).toLocaleDateString('en-US', {
+                    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+                  })}
+                />
+                <Row
+                  label="Time"
+                  value={`${new Date(selectedSlot.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – ${new Date(selectedSlot.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                />
+                <Row label="Duration" value={`${offering.duration_minutes} minutes`} />
+                <Row label="Price" value={`₹${(offering.price_inr || 0).toLocaleString()}`} />
+                <Row label="Anonymity" value={isAnonymous ? 'Enabled' : 'Disabled'} />
+                {seekerNotes && <Row label="Notes" value={seekerNotes} />}
+              </div>
+              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 text-[11px] text-[#9a9a9a]">
+                Submitting will create a booking request that the mentor must accept. Your payment is held in escrow until they do.
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: CONFIRMATION */}
+          {step === 4 && confirmedRequest && (
             <div className="space-y-6 text-center py-4">
               <div className="w-16 h-16 rounded-full bg-[#15846e]/20 text-[#15846e] border border-[#15846e]/30 flex items-center justify-center mx-auto text-2xl">
                 ✓
@@ -584,36 +539,27 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
 
               <div className="space-y-2">
                 <span className="text-xs uppercase tracking-widest text-[#15846e] font-semibold">
-                  Session Confirmed & Locked
+                  Booking Request Submitted
                 </span>
-                <h2 className="text-2xl font-normal text-white">Booking #{confirmedBooking.id}</h2>
+                <h2 className="text-2xl font-normal text-white">Request #{confirmedRequest.id}</h2>
                 <p className="text-xs text-[#9a9a9a] max-w-md mx-auto leading-relaxed">
-                  Your 1:1 consultation with {advisor.full_name} is scheduled. A calendar invite and Google Meet link have been generated.
+                  Your request is pending {advisor.full_name}'s approval. Funds are held in escrow. You'll be notified the moment they accept.
                 </p>
               </div>
 
               <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.02] text-left space-y-2 text-xs">
-                <div className="flex justify-between text-[#bdbdbd]">
-                  <span>Date & Time:</span>
-                  <span className="text-white font-medium">
-                    {new Date(confirmedBooking.start_time).toLocaleDateString('en-US', {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                    })}{' '}
-                    • {new Date(confirmedBooking.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-                <div className="flex justify-between text-[#bdbdbd]">
-                  <span>Escrow Deposit:</span>
-                  <span className="text-white font-medium">₹{(confirmedBooking.amount_inr || 0).toLocaleString()} (Held in Escrow)</span>
-                </div>
-                <div className="flex justify-between text-[#bdbdbd]">
-                  <span>Anonymity Shield:</span>
-                  <span className="text-white font-medium">
-                    {confirmedBooking.is_anonymous ? 'Enabled (Identity Masked)' : 'Disabled (Full Name Shared)'}
-                  </span>
-                </div>
+                <Row label="Mentor" value={advisor.full_name || ''} />
+                <Row label="Offering" value={offering.title} />
+                <Row
+                  label="Requested Date & Time"
+                  value={`${new Date(confirmedRequest.proposed_start_time).toLocaleDateString('en-US', {
+                    weekday: 'short', month: 'short', day: 'numeric',
+                  })} • ${new Date(confirmedRequest.proposed_start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                />
+                <Row label="Duration" value={`${offering.duration_minutes} minutes`} />
+                <Row label="Price" value={`₹${(confirmedRequest.amount_inr || 0).toLocaleString()}`} />
+                <Row label="Status" value={(confirmedRequest.status || 'pending').toUpperCase()} />
+                <Row label="Next Step" value="Awaiting mentor approval" />
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
@@ -621,37 +567,38 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
                   type="button"
                   onClick={() => {
                     handleClose();
-                    navigate(`/seeker/bookings/${confirmedBooking.id}`);
+                    navigate(`/seeker/bookings/${confirmedRequest.id}`);
                   }}
-                  className="flex-1 py-3.5 rounded-full bg-[#8052ff] hover:bg-[#6c3df0] text-white text-xs font-semibold uppercase tracking-wider transition-all"
+                  className="flex-1 py-3.5 rounded-full bg-[#8052ff] hover:bg-[#6c3df0] text-white text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
                 >
-                  Go to Session Room
+                  <Video className="w-4 h-4" />
+                  <span>View Booking Status</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     handleClose();
-                    navigate('/seeker/messages');
+                    navigate('/seeker/bookings');
                   }}
-                  className="flex-1 py-3.5 rounded-full border border-white/15 hover:border-white/30 bg-white/5 text-white text-xs font-semibold uppercase tracking-wider transition-all"
+                  className="flex-1 py-3.5 rounded-full border border-white/15 hover:border-white/30 bg-white/5 text-white text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
                 >
-                  Open Advisor Chat
+                  <MessageSquare className="w-4 h-4" />
+                  <span>All My Bookings</span>
                 </button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Footer Actions for Step 1 and Step 2 */}
-        {step !== 3 && (
+        {/* FOOTER ACTIONS */}
+        {step !== 4 && (
           <div className="p-6 border-t border-white/10 bg-black/40 flex items-center justify-between">
-            {step === 1 ? (
+            {step === 1 && (
               <>
                 <div className="text-left">
-                  <span className="text-[10px] uppercase text-[#9a9a9a] block">Escrow Rate</span>
-                  <span className="text-xl font-bold text-white">₹{(gig.price_inr || 0).toLocaleString()}</span>
+                  <span className="text-[10px] uppercase text-[#9a9a9a] block">Offering Rate</span>
+                  <span className="text-xl font-bold text-white">₹{(offering.price_inr || 0).toLocaleString()}</span>
                 </div>
-
                 <button
                   type="button"
                   onClick={handleProceedToPayment}
@@ -662,16 +609,18 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
                       : 'bg-white/10 text-[#666666] cursor-not-allowed'
                   }`}
                 >
-                  <span>Lock & Continue</span>
+                  <span>Continue to Payment</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </>
-            ) : (
+            )}
+
+            {step === 2 && (
               <>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (lockId) AvailabilityService.releaseLock(lockId);
+                  onClick={async () => {
+                    if (lockId) await AvailabilityService.releaseLock(lockId).catch(() => undefined);
                     setLockId(null);
                     setStep(1);
                   }}
@@ -679,22 +628,41 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
                 >
                   ← Change Time Slot
                 </button>
-
                 <button
                   type="button"
-                  onClick={handleExecuteAtomicBooking}
+                  onClick={handleExecuteBookingRequest}
+                  className="px-8 py-3.5 rounded-full bg-[#15846e] hover:bg-[#12705e] text-white text-xs font-semibold uppercase tracking-wider flex items-center gap-2 transition-all shadow-lg shadow-[#15846e]/30"
+                >
+                  <span>Review Booking</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </>
+            )}
+
+            {step === 3 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="text-xs uppercase tracking-wider text-[#9a9a9a] hover:text-white"
+                >
+                  ← Edit Payment
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteBookingRequest}
                   disabled={isProcessingPayment}
                   className="px-8 py-3.5 rounded-full bg-[#15846e] hover:bg-[#12705e] text-white text-xs font-semibold uppercase tracking-wider flex items-center gap-2 transition-all shadow-lg shadow-[#15846e]/30"
                 >
                   {isProcessingPayment ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Securing Escrow...</span>
+                      <span>Submitting…</span>
                     </>
                   ) : (
                     <>
-                      <span>Authorize ₹{(breakdown.grossAmount || 0).toLocaleString()}</span>
                       <ShieldCheck className="w-4 h-4" />
+                      <span>Authorize & Submit Request</span>
                     </>
                   )}
                 </button>
@@ -706,3 +674,10 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
     </div>
   );
 };
+
+const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className="flex justify-between text-[#bdbdbd]">
+    <span>{label}:</span>
+    <span className="text-white font-medium text-right max-w-[60%]">{value}</span>
+  </div>
+);

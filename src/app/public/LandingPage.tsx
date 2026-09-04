@@ -15,6 +15,7 @@ import {
   Calendar,
   Sparkles,
   Compass,
+  HelpCircle,
   FileCheck2,
   CheckCircle2,
   Clock,
@@ -94,7 +95,7 @@ export const LandingPage: React.FC = () => {
           page: 1,
         });
 
-        const featured = advisorsResponse.advisors.map((adv: AdvisorDetail) => ({
+        const featured = advisorsResponse.advisors.map((adv) => ({
           id: adv.id,
           name: adv.profile?.full_name || 'Advisor',
           role: `${adv.headline?.split('|')[0]?.trim() || 'Advisor'}`,
@@ -191,9 +192,10 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Monolithic Hero Title */}
-            <h1 className="text-display font-normal text-white max-w-2xl tracking-tight leading-[0.92]">
+            <h3 className="text-display font-normal bg-gradiant
+             text-white max-w tracking-tight leading-[0.92]">
               People who have crossed the bridge you stand before.
-            </h1>
+            </h3>
 
             {/* Hero Subtitle */}
             <p className="text-body-custom text-[#9a9a9a] max-w-2xl font-light text-lg sm:text-xl leading-relaxed">
@@ -240,6 +242,16 @@ export const LandingPage: React.FC = () => {
               />
             </div>
 
+            <div className="flex items-center justify-center gap-3 pt-4">
+              <button
+                onClick={() => navigate('/discover')}
+                className="px-6 py-3 bg-white/10 hover:bg-white/15 text-white rounded-full text-xs font-semibold uppercase tracking-wider transition-all border border-white/10 inline-flex items-center gap-2"
+              >
+                <HelpCircle className="w-4 h-4" />
+                Can't decide which to choose?
+              </button>
+            </div>
+
             {/* Platform Metrics Strip */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 pt-12 max-w-4xl w-full border-t border-white/10 mt-6">
               <div className="space-y-1">
@@ -280,14 +292,24 @@ export const LandingPage: React.FC = () => {
             description="We focus strictly on the three foundational pillars of human performance and well-being. Each segment is governed by rigorous verification standards."
             action={
               <Link
-                to="/explore"
+                to="/discover"
                 className="text-xs uppercase tracking-wider text-[#8052ff] hover:text-[#a07cff] font-semibold flex items-center gap-1.5 transition-colors"
               >
-                <span>Explore all advisors</span>
+                <span>Open discovery</span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
             }
           />
+
+          <div className="flex justify-end -mt-8">
+            <button
+              onClick={() => navigate('/discover')}
+              className="px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 text-[#9a9a9a] hover:text-white text-xs uppercase tracking-wider inline-flex items-center gap-2 transition-all border border-white/5"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              Can't decide? Describe your situation →
+            </button>
+          </div>
 
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -306,7 +328,7 @@ export const LandingPage: React.FC = () => {
                 return (
                   <Link
                     key={seg.id}
-                    to={`/explore?segment=${seg.slug}`}
+                    to={`/discover?segment=${seg.slug}`}
                     className="p-8 rounded-[28px] border border-white/10 hover:border-[#8052ff]/50 bg-white/[0.015] hover:bg-white/[0.035] transition-all duration-300 flex flex-col justify-between space-y-8 group relative overflow-hidden"
                   >
                     <div className="space-y-4">
@@ -446,7 +468,7 @@ export const LandingPage: React.FC = () => {
                   {/* Actions */}
                   <div className="pt-2">
                     <Link
-                      to={`/advisors/${advisor.id}`}
+                      to={`/mentor/${advisor.id}`}
                       className="w-full py-3 bg-[#8052ff] hover:bg-[#6c3df0] text-white rounded-full text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-200 shadow-sm shadow-[#8052ff]/20"
                     >
                       <span>View Profile & Book</span>
@@ -571,7 +593,7 @@ export const LandingPage: React.FC = () => {
         </section>
 
         {/* =========================================================================
-            SECTION 6: Seeker Testimonials (from reviews)
+            SECTION 6: Seeker Testimonials (from real reviews)
            ========================================================================= */}
         <section className="py-24 px-6 max-w-[1280px] mx-auto space-y-16 border-b border-white/5">
           <SectionHeader
@@ -581,48 +603,8 @@ export const LandingPage: React.FC = () => {
             description="Hear from professionals and partners who unlocked momentum with Suggest Key."
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                quote: 'Dr. Vasquez cut through 6 months of mental fog in 45 minutes. Her clinical grounding made every minute actionable.',
-                author: 'Ananya S.',
-                title: 'VP of Product, FinTech',
-                session: 'Mental Health • Burnout Diagnostics',
-              },
-              {
-                quote: 'Marcus helped me structure my Staff+ promotion packet and navigate cross-team architectural alignment.',
-                author: 'Kavita Sundaram',
-                title: 'Principal Engineer, Distributed Systems',
-                session: 'Career • Staff+ Strategy',
-              },
-              {
-                quote: 'Dr. Chen transformed our communication dynamics in two sessions. His Gottman-backed framework gave us exact language.',
-                author: 'Karan & Ritu M.',
-                title: 'Founding Partners',
-                session: 'Relationship • Conflict Calibration',
-              },
-            ].map((t, idx) => (
-              <div
-                key={idx}
-                className="p-8 rounded-[24px] border border-white/10 bg-white/[0.02] flex flex-col justify-between space-y-6"
-              >
-                <div className="space-y-4">
-                  <div className="flex items-center gap-1 text-[#ffb829]">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} className="w-4 h-4 fill-[#ffb829]" />
-                    ))}
-                  </div>
-                  <p className="text-sm text-[#bdbdbd] font-light leading-relaxed italic">
-                    "{t.quote}"
-                  </p>
-                </div>
-                <div className="space-y-1 pt-4 border-t border-white/5">
-                  <div className="text-sm font-medium text-white">{t.author}</div>
-                  <div className="text-xs text-[#9a9a9a]">{t.title}</div>
-                  <div className="text-[11px] text-[#8052ff] uppercase tracking-wider pt-1">{t.session}</div>
-                </div>
-              </div>
-            ))}
+          <div className="p-8 rounded-[24px] border border-dashed border-white/10 text-center text-xs text-[#9a9a9a]">
+            No testimonials yet. Reviews from verified seekers will appear here after completed sessions.
           </div>
         </section>
 
@@ -690,7 +672,7 @@ export const LandingPage: React.FC = () => {
                   </li>
                 ))}
                 <li>
-                  <Link to="/explore" className="hover:text-white transition-colors">
+                  <Link to="/discover" className="hover:text-white transition-colors">
                     Explore All Advisors
                   </Link>
                 </li>

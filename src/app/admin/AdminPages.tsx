@@ -1,6 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useToast } from '../../components/ui/Toast';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
+import { MentorSegment, Offering } from '../../lib/supabase/types';
 import {
   AdminService,
   AdminUser,
@@ -581,18 +583,50 @@ export const AdminUsersPage: React.FC = () => {
                     </span>
                   </td>
                   <td className="p-4 pr-6 text-right">
-                    {user.role !== 'admin' && (
-                      <button
-                        onClick={() => handleToggleStatus(user)}
-                        className={`px-3 py-1 rounded-full text-[11px] uppercase font-semibold transition-all ${
-                          user.status === 'active'
-                            ? 'border border-rose-500/30 text-rose-300 hover:bg-rose-500/10'
-                            : 'border border-[#15846e]/30 text-[#15846e] hover:bg-[#15846e]/10'
-                        }`}
+                    <div className="inline-flex items-center gap-2">
+                      {/* Role changer — available for every user including
+                          other admins (only admins can see this page). */}
+                      <select
+                        value={user.role}
+                        onChange={async (e) => {
+                          const newRole = e.target.value as 'seeker' | 'mentor' | 'admin';
+                          if (newRole === user.role) return;
+                          const res = await AdminService.promoteUserRole(user.id, newRole);
+                          if (res.success) {
+                            setUsers((prev) =>
+                              prev.map((u) => (u.id === user.id ? { ...u, role: newRole } : u))
+                            );
+                            toast({
+                              title: 'Role Updated',
+                              description: `${user.full_name} is now ${newRole.toUpperCase()}.`,
+                            });
+                          } else {
+                            toast({
+                              title: 'Role Change Blocked',
+                              description: res.error || 'Insufficient permissions.',
+                            });
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] uppercase font-semibold text-white focus:outline-none focus:border-[#8052ff]"
                       >
-                        {user.status === 'active' ? 'Suspend' : 'Reactivate'}
-                      </button>
-                    )}
+                        <option value="seeker">Seeker</option>
+                        <option value="mentor">Mentor</option>
+                        <option value="admin">Admin</option>
+                      </select>
+
+                      {user.role !== 'admin' && (
+                        <button
+                          onClick={() => handleToggleStatus(user)}
+                          className={`px-3 py-1 rounded-full text-[11px] uppercase font-semibold transition-all ${
+                            user.status === 'active'
+                              ? 'border border-rose-500/30 text-rose-300 hover:bg-rose-500/10'
+                              : 'border border-[#15846e]/30 text-[#15846e] hover:bg-[#15846e]/10'
+                          }`}
+                        >
+                          {user.status === 'active' ? 'Suspend' : 'Reactivate'}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -814,7 +848,7 @@ export const AdminMentorsPage: React.FC = () => {
               <div className="pt-4 border-t border-white/5 flex items-center justify-between gap-2">
                 <select
                   value={mentor.tier}
-                  onChange={(e) => handleUpdateTier(mentor.id, e.target.value as any)}
+                  onChange={(e) => handleUpdateTier(mentor.id, e.target.value as 'Standard' | 'Verified Pro' | 'Top Rated')}
                   className="bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#8052ff]"
                 >
                   <option value="Standard">Standard Tier</option>
@@ -823,11 +857,10 @@ export const AdminMentorsPage: React.FC = () => {
                 </select>
 
                 <Link
-                  to={`/advisors/${mentor.id}`}
-                  target="_blank"
+                  to={`/admin/mentors/${mentor.id}`}
                   className="px-3 py-1.5 rounded-full border border-white/10 hover:bg-white/5 text-xs text-[#bdbdbd] hover:text-white"
                 >
-                  Public Profile â†—
+                  <span>View Mentor</span>
                 </Link>
               </div>
             </div>
@@ -1336,14 +1369,14 @@ export const AdminReportsPage: React.FC = () => {
    ========================================================================== */
 export const AdminSettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<PlatformSettings>({
-    platform_fee_percent: 15,
-    escrow_hold_hours: 24,
-    require_mental_health_audit: true,
-    require_financial_audit: true,
-    payment_gateway_mode: 'sandbox',
-    razorpay_key_id: 'rzp_test_SuggestKeyPlatform2026',
-    auto_payout_enabled: true,
-    max_session_duration_minutes: 90,
+    platform_fee_percent: 0,
+    escrow_hold_hours: 0,
+    require_mental_health_audit: false,
+    require_financial_audit: false,
+    payment_gateway_mode: 'live',
+    razorpay_key_id: '',
+    auto_payout_enabled: false,
+    max_session_duration_minutes: 60,
   });
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -1351,7 +1384,7 @@ export const AdminSettingsPage: React.FC = () => {
   useEffect(() => {
     async function loadSettings() {
       const data = await AdminService.getSettings();
-      setSettings(data);
+      if (data) setSettings(data);
     }
     loadSettings();
   }, []);
@@ -1360,7 +1393,7 @@ export const AdminSettingsPage: React.FC = () => {
     e.preventDefault();
     setSaving(true);
     const res = await AdminService.updateSettings(settings);
-    setSettings(res);
+    if (res) setSettings(res);
     setSaving(false);
     toast({
       title: 'Platform Parameters Saved',
@@ -1458,7 +1491,7 @@ export const AdminSettingsPage: React.FC = () => {
               <label className="text-xs uppercase tracking-wider text-[#9a9a9a]">Gateway Environment</label>
               <select
                 value={settings.payment_gateway_mode}
-                onChange={(e) => setSettings({ ...settings, payment_gateway_mode: e.target.value as any })}
+                onChange={(e) => setSettings({ ...settings, payment_gateway_mode: e.target.value as 'sandbox' | 'live' })}
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#8052ff]"
               >
                 <option value="sandbox">Sandbox (Simulated Escrow Ledger)</option>
@@ -1487,6 +1520,200 @@ export const AdminSettingsPage: React.FC = () => {
           <span>{saving ? 'Applying...' : 'Save System Parameters'}</span>
         </button>
       </form>
+    </div>
+  );
+};
+
+/* ==========================================================================
+   8. ADMIN MENTOR DETAIL PAGE
+   ========================================================================== */
+export const AdminMentorDetailPage: React.FC = () => {
+  const { mentorId } = useParams<{ mentorId: string }>();
+  const [mentor, setMentor] = useState<AdminMentorDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [mentorSegments, setMentorSegments] = useState<MentorSegment[]>([]);
+  const [loadingSegments, setLoadingSegments] = useState(true);
+  const [offerings, setOfferings] = useState<Offering[]>([]);
+  const [loadingOfferings, setLoadingOfferings] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const loadMentor = async () => {
+      if (!mentorId) return;
+      setLoading(true);
+      const data = await AdminService.getMentorDetail(mentorId);
+      setMentor(data);
+      setLoading(false);
+    };
+    loadMentor();
+  }, [mentorId]);
+
+  useEffect(() => {
+    const loadMentorSegments = async () => {
+      if (!mentorId || !isSupabaseConfigured) return;
+      setLoadingSegments(true);
+      const { data, error } = await supabase
+        .from('mentor_segments')
+        .select('*, segment:advisory_segments(*)')
+        .eq('mentor_id', mentorId);
+      if (error) console.error('Error fetching mentor segments:', error);
+      setMentorSegments(data || []);
+      setLoadingSegments(false);
+    };
+    loadMentorSegments();
+  }, [mentorId]);
+
+  useEffect(() => {
+    const loadOfferings = async () => {
+      if (!isSupabaseConfigured) {
+        setLoadingOfferings(false);
+        return;
+      }
+      setLoadingOfferings(true);
+      const { data: msData } = await supabase
+        .from('mentor_segments')
+        .select('id')
+        .eq('mentor_id', mentorId);
+      if (msData && msData.length > 0) {
+        const msIds = msData.map((ms: { id: string }) => ms.id);
+        const { data: offData } = await supabase
+          .from('offerings')
+          .select('*, mentor_segment:mentor_segments(*, segment:advisory_segments(*))')
+          .in('mentor_segment_id', msIds);
+        setOfferings(offData || []);
+      }
+      setLoadingOfferings(false);
+    };
+    loadOfferings();
+  }, [mentorId]);
+
+  if (loading || !mentor) {
+    return (
+      <div className="p-6 text-center text-xs text-[#9a9a9a]">
+        Loading mentor details...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link
+            to="/admin/mentors"
+            className="text-xs text-[#9a9a9a] hover:text-white transition-colors"
+          >
+            &larr; Back to Mentors
+          </Link>
+          <h1 className="text-xl font-semibold text-white">Mentor Detail</h1>
+        </div>
+        <Link
+          to={`/mentor/${mentorId}`}
+          target="_blank"
+          className="px-4 py-2 rounded-full border border-white/10 hover:bg-white/5 text-xs text-[#bdbdbd] hover:text-white flex items-center gap-1"
+        >
+          <span>Public Profile</span>
+          <ExternalLink className="w-3 h-3" />
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1 space-y-4">
+          <div className="p-6 rounded-[20px] border border-white/10 bg-white/[0.02] space-y-4">
+            <img
+              src={mentor.profile?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80'}
+              alt={mentor.profile?.full_name || 'Mentor'}
+              className="w-20 h-20 rounded-[16px] object-cover border border-white/10"
+            />
+            <div>
+              <h2 className="text-lg font-semibold text-white">
+                {mentor.profile?.full_name || 'Unnamed Mentor'}
+              </h2>
+              <p className="text-xs text-[#9a9a9a] mt-1">
+                {mentor.headline || 'No headline provided'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <span className={`px-2.5 py-1 rounded-full text-[10px] uppercase font-semibold ${
+                mentor.verification_status === 'approved'
+                  ? 'bg-[#15846e] text-white'
+                  : mentor.verification_status === 'suspended'
+                  ? 'bg-[#991b1b] text-white'
+                  : 'bg-[#7c2d12] text-white'
+              }`}>
+                {mentor.verification_status}
+              </span>
+              <span className="text-xs text-[#9a9a9a]">
+                {(mentor.rating || 0).toFixed(2)} reviews &middot; {mentor.review_count || 0}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-6 rounded-[20px] border border-white/10 bg-white/[0.02] space-y-3">
+            <h3 className="text-xs uppercase text-[#9a9a9a] font-semibold">Stats</h3>
+            <div className="text-2xl font-bold text-white">
+              {mentor.completed_sessions || 0}
+            </div>
+            <span className="text-xs text-[#9a9a9a]">Completed Sessions</span>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 space-y-6">
+          <div className="p-6 rounded-[20px] border border-white/10 bg-white/[0.02]">
+            <h3 className="text-sm font-medium text-white mb-4">Segments</h3>
+            {loadingSegments ? (
+              <p className="text-xs text-[#9a9a9a]">Loading segments...</p>
+            ) : mentorSegments.length === 0 ? (
+              <p className="text-xs text-[#9a9a9a]">No segments associated with this mentor.</p>
+            ) : (
+              <div className="space-y-2">
+                {mentorSegments.map((ms) => (
+                  <div key={ms.id} className="flex items-center justify-between p-3 rounded-xl bg-black/40 border border-white/5">
+                    <div>
+                      <span className="text-sm text-white font-medium">
+                        {ms.segment?.name || 'Unknown Segment'}
+                      </span>
+                      <span className="ml-2 text-xs text-[#9a9a9a]">
+                        {ms.segment?.slug}
+                      </span>
+                    </div>
+                    <span className={`text-[10px] px-2 py-1 rounded-full ${
+                      ms.status === 'active' ? 'bg-[#15846e]/20 text-[#15846e]' :
+                      ms.status === 'inactive' ? 'bg-[#7c2d12]/20 text-[#7c2d12]' :
+                      'bg-[#9a9a9a]/20 text-[#9a9a9a]'
+                    }`}>
+                      {ms.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="p-6 rounded-[20px] border border-white/10 bg-white/[0.02]">
+            <h3 className="text-sm font-medium text-white mb-4">Offerings ({offerings.length})</h3>
+            {loadingOfferings ? (
+              <p className="text-xs text-[#9a9a9a]">Loading offerings...</p>
+            ) : offerings.length === 0 ? (
+              <p className="text-xs text-[#9a9a9a]">No offerings configured.</p>
+            ) : (
+              <div className="space-y-3">
+                {offerings.map((offering) => (
+                  <div key={offering.id} className="p-4 rounded-xl bg-black/40 border border-white/5">
+                    <div className="flex items-start justify-between">
+                      <h4 className="text-sm font-medium text-white">{offering.title}</h4>
+                      <span className="text-sm text-white">₹{(offering.price_inr || 0).toLocaleString()}</span>
+                    </div>
+                    <p className="text-xs text-[#9a9a9a] mt-1 line-clamp-1">
+                      {offering.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

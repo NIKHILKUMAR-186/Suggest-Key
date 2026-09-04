@@ -5,7 +5,7 @@
 
 export function getEnv(key: string, defaultValue: string = ''): string {
   try {
-    const env = import.meta.env as Record<string, any> | undefined;
+    const env = import.meta.env as Record<string, unknown> | undefined;
     if (env) {
       if (env[key] !== undefined && env[key] !== '') return String(env[key]);
       if (env[`VITE_${key}`] !== undefined && env[`VITE_${key}`] !== '') return String(env[`VITE_${key}`]);
@@ -24,7 +24,7 @@ export function getEnv(key: string, defaultValue: string = ''): string {
   }
 
   try {
-    const win = typeof window !== 'undefined' ? (window as any) : undefined;
+    const win = typeof window !== 'undefined' ? (window as Window & { __APP_ENV__?: Record<string, string> }) : undefined;
     if (win?.__APP_ENV__) {
       if (win.__APP_ENV__[key] !== undefined && win.__APP_ENV__[key] !== '') return String(win.__APP_ENV__[key]);
       if (win.__APP_ENV__[`VITE_${key}`] !== undefined && win.__APP_ENV__[`VITE_${key}`] !== '') return String(win.__APP_ENV__[`VITE_${key}`]);

@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
-import { Profile, Mentor, BookingStatus } from '../../lib/supabase/types';
+import { Profile, Mentor, Gig, Booking } from '../../lib/supabase/types';
 import { SegmentService } from '../segment/SegmentService';
 import { BookingService } from '../booking/BookingService';
 
@@ -57,49 +57,26 @@ export interface PlatformSettings {
   max_session_duration_minutes: number;
 }
 
-const DEFAULT_SETTINGS: PlatformSettings = {
-  platform_fee_percent: 15,
-  escrow_hold_hours: 24,
-  require_mental_health_audit: true,
-  require_financial_audit: true,
-  payment_gateway_mode: 'sandbox',
-  razorpay_key_id: 'rzp_test_SuggestKeyPlatform2026',
-  auto_payout_enabled: true,
-  max_session_duration_minutes: 90,
-};
-
 export class AdminService {
   /**
    * Get High Level Platform KPIs from Supabase
    */
   static async getPlatformMetrics() {
-    if (!isSupabaseConfigured) {
-      return {
-        totalGMV: 0,
-        platformCommission: 0,
-        totalSeekers: 0,
-        totalMentors: 0,
-        totalBookings: 0,
-        pendingAudits: 0,
-        openDisputes: 0,
-        systemHealth: 'Database not configured',
-      };
-    }
-
     try {
-      // Get counts from database
       const [
         { count: seekerCount },
         { count: mentorCount },
         { count: bookingCount },
         { count: pendingVerificationCount },
         { data: bookings },
+        { count: openDisputes },
       ] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'seeker'),
         supabase.from('mentors').select('*', { count: 'exact', head: true }),
         supabase.from('bookings').select('*', { count: 'exact', head: true }),
         supabase.from('mentors').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
         supabase.from('bookings').select('amount_inr, platform_fee_inr'),
+        supabase.from('disputes').select('*', { count: 'exact', head: true }).eq('status', 'open'),
       ]);
 
       const totalGMV = bookings?.reduce((sum, b) => sum + (b.amount_inr || 0), 0) || 0;
@@ -112,8 +89,8 @@ export class AdminService {
         totalMentors: mentorCount || 0,
         totalBookings: bookingCount || 0,
         pendingAudits: pendingVerificationCount || 0,
-        openDisputes: 0,
-        systemHealth: 'All Systems Operational (99.98% SLA)',
+        openDisputes: openDisputes || 0,
+        systemHealth: null,
       };
     } catch (err) {
       console.error('Error fetching platform metrics:', err);
@@ -125,7 +102,7 @@ export class AdminService {
         totalBookings: 0,
         pendingAudits: 0,
         openDisputes: 0,
-        systemHealth: 'Error fetching metrics',
+        systemHealth: null,
       };
     }
   }
@@ -160,7 +137,6 @@ export class AdminService {
         return [];
       }
 
-      // Get booking counts for each user
       const usersWithStats = await Promise.all(
         (data || []).map(async (profile) => {
           const { count: bookingCount } = await supabase
@@ -190,8 +166,6 @@ export class AdminService {
   }
 
   static async toggleUserStatus(userId: string): Promise<AdminUser | null> {
-    // Note: In a real implementation, you might have a status field on profiles
-    // For now, we'll just return the user
     const users = await this.getUsers();
     return users.find(u => u.id === userId) || null;
   }
@@ -220,19 +194,17 @@ export class AdminService {
         return [];
       }
 
-      return (data || []).map((mentor: any) => {
-        const segment = mentor.segment_id ? SegmentService.getCachedSegmentBySlug(mentor.segment_id) : null;
-
+      return (data || []).map((mentor: Mentor & { profile?: Profile; gigs?: Gig[] }) => {
         return {
           ...mentor,
           category_names: mentor.verified_categories?.map((catId: string) =>
             SegmentService.getCachedSegmentBySlug(catId)?.name || catId
           ) || [],
           gigs_count: mentor.gigs?.length || 0,
-          tier: (mentor.rating || 5) >= 4.95 ? 'Top Rated' : 'Verified Pro',
-          commission_percent: 15,
+          tier: (mentor.rating || 0) >= 4.95 ? 'Top Rated' : 'Verified Pro',
+          commission_percent: 0,
           is_suspended: false,
-          total_revenue_inr: Math.round((mentor.review_count || 0) * 3800),
+          total_revenue_inr: 0,
           completed_sessions: mentor.review_count || 0,
         };
       });
@@ -243,12 +215,80 @@ export class AdminService {
   }
 
   /**
-   * Disputes & Reports - For now, return empty (disputes table not yet created)
+   * Get single mentor detail for admin management view
+   */
+  static async getMentorDetail(mentorId: string): Promise<AdminMentorDetail | null> {
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Cannot fetch mentor detail.');
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('mentors')
+        .select(`
+          *,
+          profile:profiles(*),
+          gigs:gigs(*),
+          mentor_segments:mentor_segments(
+            id,
+            segment_id,
+            status,
+            created_at
+          )
+        `)
+        .eq('id', mentorId)
+        .single();
+
+      if (error || !data) {
+        console.error('Error fetching mentor detail:', error);
+        return null;
+      }
+
+      const mentor = data as unknown as Mentor & { profile?: Profile; gigs?: Gig[] };
+
+      return {
+        ...mentor,
+        category_names: mentor.verified_categories?.map((catId: string) =>
+          SegmentService.getCachedSegmentBySlug(catId)?.name || catId
+        ) || [],
+        gigs_count: mentor.gigs?.length || 0,
+        tier: (mentor.rating || 0) >= 4.95 ? 'Top Rated' : 'Verified Pro',
+        commission_percent: 0,
+        is_suspended: false,
+        total_revenue_inr: 0,
+        completed_sessions: mentor.review_count || 0,
+      } as AdminMentorDetail;
+    } catch (err) {
+      console.error('Error in getMentorDetail:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Disputes & Reports - queries the disputes table.
    */
   static async getDisputes(): Promise<DisputeRecord[]> {
-    // Disputes table not yet implemented in database
-    // This would be implemented similarly to other services
-    return [];
+    if (!isSupabaseConfigured) {
+      return [];
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('disputes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching disputes:', error);
+        return [];
+      }
+
+      return (data || []) as DisputeRecord[];
+    } catch (err) {
+      console.error('Error in getDisputes:', err);
+      return [];
+    }
   }
 
   static async createDispute(params: {
@@ -260,9 +300,36 @@ export class AdminService {
     amountInr: number;
     issueCategory: 'no_show' | 'deliverable_missing' | 'quality_dispute' | 'technical_interruption';
     statement: string;
-  }): Promise<DisputeRecord> {
-    // Disputes table not yet implemented
-    throw new Error('Dispute system not yet implemented in database.');
+  }): Promise<DisputeRecord | null> {
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase not configured.');
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('disputes')
+        .insert({
+          booking_id: params.bookingId,
+          seeker_id: params.seekerId,
+          seeker_name: params.seekerName,
+          mentor_id: params.mentorId,
+          mentor_name: params.mentorName,
+          amount_inr: params.amountInr,
+          issue_category: params.issueCategory,
+          statement: params.statement,
+          status: 'open',
+        })
+        .select('*')
+        .single();
+
+      if (error || !data) {
+        throw new Error(error?.message || 'Failed to create dispute.');
+      }
+
+      return data as DisputeRecord;
+    } catch (err) {
+      throw new Error(err?.message || 'Failed to create dispute.');
+    }
   }
 
   static async resolveDispute(params: {
@@ -271,35 +338,104 @@ export class AdminService {
     notes: string;
     auditorName?: string;
   }): Promise<DisputeRecord | null> {
-    // Disputes table not yet implemented
-    throw new Error('Dispute system not yet implemented in database.');
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase not configured.');
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('disputes')
+        .update({
+          status: 'resolved',
+          resolution: params.resolution,
+          resolution_notes: params.notes,
+          resolved_at: new Date().toISOString(),
+          resolved_by: params.auditorName || null,
+        })
+        .eq('id', params.disputeId)
+        .select('*')
+        .single();
+
+      if (error || !data) {
+        throw new Error(error?.message || 'Failed to resolve dispute.');
+      }
+
+      return data as DisputeRecord;
+    } catch (err) {
+      throw new Error(err?.message || 'Failed to resolve dispute.');
+    }
   }
 
   /**
-   * Platform Settings - Stored in localStorage for now (admin config)
+   * Platform Settings - read from the platform_settings table.
+   * Returns null when no settings row exists yet.
    */
-  static getPlatformSettings(): PlatformSettings {
-    try {
-      const data = localStorage.getItem('suggestkey_admin_settings');
-      if (data) return JSON.parse(data);
-    } catch (e) {
-      console.warn('Error reading settings:', e);
+  static async getPlatformSettings(): Promise<PlatformSettings | null> {
+    if (!isSupabaseConfigured) {
+      return null;
     }
-    return DEFAULT_SETTINGS;
+
+    try {
+      const { data, error } = await supabase
+        .from('platform_settings')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error || !data) {
+        return null;
+      }
+
+      return data as PlatformSettings;
+    } catch (err) {
+      console.error('Error in getPlatformSettings:', err);
+      return null;
+    }
   }
 
-  static updatePlatformSettings(settings: Partial<PlatformSettings>): PlatformSettings {
-    const current = this.getPlatformSettings();
-    const updated = { ...current, ...settings };
-    localStorage.setItem('suggestkey_admin_settings', JSON.stringify(updated));
-    return updated;
+  static async updatePlatformSettings(settings: Partial<PlatformSettings>): Promise<PlatformSettings | null> {
+    if (!isSupabaseConfigured) {
+      return null;
+    }
+
+    try {
+      const { data: existing } = await supabase
+        .from('platform_settings')
+        .select('id')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (existing?.id) {
+        const { data, error } = await supabase
+          .from('platform_settings')
+          .update(settings)
+          .eq('id', existing.id)
+          .select('*')
+          .single();
+        if (error || !data) return null;
+        return data as PlatformSettings;
+      } else {
+        const { data, error } = await supabase
+          .from('platform_settings')
+          .insert(settings)
+          .select('*')
+          .single();
+        if (error || !data) return null;
+        return data as PlatformSettings;
+      }
+    } catch (err) {
+      console.error('Error in updatePlatformSettings:', err);
+      return null;
+    }
   }
 
-  static getSettings(): PlatformSettings {
+  static async getSettings(): Promise<PlatformSettings | null> {
     return this.getPlatformSettings();
   }
 
-  static updateSettings(settings: Partial<PlatformSettings>): PlatformSettings {
+  static async updateSettings(settings: Partial<PlatformSettings>): Promise<PlatformSettings | null> {
     return this.updatePlatformSettings(settings);
   }
 
@@ -308,25 +444,86 @@ export class AdminService {
   }
 
   static async updateUserStatus(userId: string, status: 'active' | 'suspended'): Promise<AdminUser | null> {
-    const users = await this.getUsers();
-    const index = users.findIndex(u => u.id === userId);
-    if (index === -1) return null;
-    users[index].status = status;
-    return users[index];
+    if (!isSupabaseConfigured) {
+      return null;
+    }
+
+    try {
+      await supabase
+        .from('profiles')
+        .update({ status })
+        .eq('id', userId);
+
+      const users = await this.getUsers();
+      return users.find(u => u.id === userId) || null;
+    } catch (err) {
+      console.error('Error in updateUserStatus:', err);
+      return null;
+    }
+  }
+
+  static async promoteUserRole(
+    userId: string,
+    newRole: 'seeker' | 'mentor' | 'admin'
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: 'Supabase is not configured.' };
+    }
+
+    try {
+      const { error } = await supabase.rpc('promote_user_role', {
+        p_target_user_id: userId,
+        p_new_role: newRole,
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err?.message || 'Failed to change role' };
+    }
   }
 
   static async getAllMentors(): Promise<AdminMentorDetail[]> {
     return this.getMentors();
   }
 
-  static async updateMentorTier(mentorId: string, tier: 'Standard' | 'Verified Pro' | 'Top Rated'): Promise<boolean> {
-    // Tier is computed from rating, not stored separately
-    return true;
+  static async updateMentorTier(mentorId: string, tier: 'Standard' | 'Verified Pro' | 'Top Rated'): Promise<AdminMentorDetail | null> {
+    if (!isSupabaseConfigured) {
+      return null;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('mentors')
+        .update({ tier })
+        .eq('id', mentorId);
+
+      if (error) return null;
+
+      return this.getMentorDetail(mentorId);
+    } catch {
+      return null;
+    }
   }
 
-  static async updateMentorCommission(mentorId: string, commissionPercent: number): Promise<boolean> {
-    // Commission is platform-wide, not per-mentor in current implementation
-    return true;
+  static async updateMentorCommission(mentorId: string, commissionPercent: number): Promise<AdminMentorDetail | null> {
+    if (!isSupabaseConfigured) {
+      return null;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('mentors')
+        .update({ commission_percent: commissionPercent })
+        .eq('id', mentorId);
+
+      if (error) return null;
+
+      return this.getMentorDetail(mentorId);
+    } catch {
+      return null;
+    }
   }
 
   static async getAllDisputes(): Promise<DisputeRecord[]> {
@@ -337,9 +534,6 @@ export class AdminService {
     return BookingService.getAllBookings();
   }
 
-  /**
-   * Get platform KPIs from Supabase
-   */
   static async getPlatformKPIs() {
     if (!isSupabaseConfigured) {
       return {
@@ -360,11 +554,13 @@ export class AdminService {
         { count: userCount },
         { count: mentorCount },
         { count: pendingVerifications },
+        { count: openDisputes },
       ] = await Promise.all([
         supabase.from('bookings').select('amount_inr, platform_fee_inr, status'),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('mentors').select('*', { count: 'exact', head: true }).eq('verification_status', 'approved'),
         supabase.from('mentors').select('*', { count: 'exact', head: true }).in('verification_status', ['pending', 'review']),
+        supabase.from('disputes').select('*', { count: 'exact', head: true }).eq('status', 'open'),
       ]);
 
       const totalGrossVolumeInr = bookings?.reduce((sum, b) => sum + (b.amount_inr || 0), 0) || 0;
@@ -381,7 +577,7 @@ export class AdminService {
         activeUsersCount: userCount || 0,
         activeMentorsCount: mentorCount || 0,
         pendingVerificationsCount: pendingVerifications || 0,
-        openDisputesCount: 0,
+        openDisputesCount: openDisputes || 0,
       };
     } catch (err) {
       console.error('Error fetching platform KPIs:', err);
@@ -423,9 +619,6 @@ export class AdminService {
     }
   }
 
-  /**
-   * Get segment analytics from Supabase
-   */
   static async getSegmentAnalytics() {
     if (!isSupabaseConfigured) {
       return [];
@@ -438,24 +631,24 @@ export class AdminService {
         supabase.from('bookings').select('*'),
       ]);
 
-      const mentorsData = mentors.data || [];
-      const bookingsData = bookings.data || [];
+      const mentorsData = (mentors.data || []) as (Mentor & { gigs?: Gig[] })[];
+      const bookingsData = (bookings.data || []) as Booking[];
 
       return segments.map((seg) => {
         const segAdvisors = mentorsData.filter(
-          (a: any) =>
+          (a) =>
             a.segment_id === seg.id ||
             a.primary_segment_id === seg.id ||
             a.verified_categories?.includes(seg.slug)
         );
 
-        const activeAdvisors = segAdvisors.filter((a: any) => a.verification_status === 'approved');
+        const activeAdvisors = segAdvisors.filter((a) => a.verification_status === 'approved');
 
         const segBookings = bookingsData.filter(
-          (b: any) => b.segment_id === seg.id
+          (b) => b.segment_id === seg.id
         );
 
-        const totalGmv = segBookings.reduce((sum: number, b: any) => sum + (b.amount_inr || 0), 0);
+        const totalGmv = segBookings.reduce((sum: number, b) => sum + (b.amount_inr || 0), 0);
 
         return {
           segment: seg,
@@ -464,7 +657,7 @@ export class AdminService {
           booking_count: segBookings.length,
           total_gmv_inr: totalGmv,
           pending_verification_count: segAdvisors.filter(
-            (a: any) => a.verification_status === 'review' || a.verification_status === 'pending'
+            (a) => a.verification_status === 'review' || a.verification_status === 'pending'
           ).length,
         };
       });
