@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../domains/auth/AuthContext';
 import { authConfig } from '../../config/authConfig';
@@ -24,6 +24,8 @@ export const LoginPage: React.FC = () => {
     config,
     isCooldownActive,
     cooldownSecondsRemaining,
+    role,
+    authStatus,
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -38,7 +40,7 @@ export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [localLoading, setLocalLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [otpSent, setOtpSent] = useState(false);
 
@@ -48,6 +50,37 @@ export const LoginPage: React.FC = () => {
   const [resetStatus, setResetStatus] = useState<{ success?: boolean; message?: string }>({});
 
   const fromLocation = (location.state as any)?.from?.pathname;
+
+  const getDestination = () => {
+    const home =
+      role === 'admin' ? '/admin' :
+      role === 'mentor' ? '/mentor' :
+      '/seeker';
+
+    if (!fromLocation || fromLocation === '/login' || fromLocation === '/signup') {
+      return home;
+    }
+
+    if (role === 'admin' && fromLocation.startsWith('/admin')) {
+      return fromLocation;
+    }
+
+    if (role === 'mentor' && (fromLocation === '/mentor/onboarding' || fromLocation.startsWith('/mentor/'))) {
+      return fromLocation;
+    }
+
+    if (role === 'seeker' && fromLocation.startsWith('/seeker')) {
+      return fromLocation;
+    }
+
+    return home;
+  };
+
+  useEffect(() => {
+    if (authStatus === 'authenticated' && role) {
+      navigate(getDestination(), { replace: true });
+    }
+  }, [authStatus, role, navigate, fromLocation]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,17 +101,15 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
-    setLoading(true);
+    setLocalLoading(true);
     setErrorMsg('');
 
     const res = await signIn(email, authMode === 'password' ? password : undefined);
-    setLoading(false);
+    setLocalLoading(false);
 
     if (res.success) {
       if (authMode === 'otp' && isConfigured) {
         setOtpSent(true);
-      } else {
-        navigate(fromLocation || '/seeker', { replace: true });
       }
     } else {
       setErrorMsg(res.error || 'Failed to authenticate');
@@ -283,10 +314,10 @@ export const LoginPage: React.FC = () => {
 
               <button
                 type="submit"
-                disabled={loading || isCooldownActive}
+                disabled={localLoading || isCooldownActive}
                 className="w-full py-3.5 bg-[#8052ff] hover:bg-[#6c3df0] disabled:opacity-50 text-white rounded-full text-xs uppercase tracking-wider font-semibold transition-all shadow-md shadow-[#8052ff]/20 mt-2"
               >
-                {loading
+                {localLoading
                   ? 'Authenticating...'
                   : authMode === 'password'
                   ? 'Sign In'

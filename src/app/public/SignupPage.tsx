@@ -19,15 +19,13 @@ import {
 
 export const SignupPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const requestedRole = (searchParams.get('role') as UserRole) || 'seeker';
-  // Admin role can NEVER be selected from the public signup page, regardless
-  // of any `?role=` URL parameter. Only existing admins may create admins.
-  const initialRole: UserRole = requestedRole === 'admin' ? 'seeker' : requestedRole;
+  const requestedRole = searchParams.get('role');
+  const initialRole: UserRole | null = requestedRole === 'mentor' ? 'mentor' : null;
 
   const { signUp, isConfigured } = useAuth();
   const navigate = useNavigate();
 
-  const [selectedRole, setSelectedRole] = useState<UserRole>(initialRole);
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(initialRole);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,6 +44,11 @@ export const SignupPage: React.FC = () => {
     e.preventDefault();
     if (!email || !fullName) {
       setErrorMsg('Please complete all required fields');
+      return;
+    }
+
+    if (!selectedRole) {
+      setErrorMsg('Please choose whether you are joining as a Seeker or Mentor');
       return;
     }
 
@@ -75,7 +78,7 @@ export const SignupPage: React.FC = () => {
       if (isConfigured) {
         setSignedUpSuccess(true);
       } else {
-        const dest = selectedRole === 'mentor' ? '/mentor' : '/seeker';
+        const dest = selectedRole === 'seeker' ? '/seeker' : '/mentor';
         navigate(dest, { replace: true });
       }
     } else {

@@ -142,38 +142,44 @@ export class AdvisorService {
     const offset = (page - 1) * limit;
     const targetSegment = filters.segment || filters.categoryId;
 
-    if (!isSupabaseConfigured) {
-      console.warn('Supabase not configured. Returning empty advisors.');
-      return {
-        advisors: [],
-        hasMore: false,
-        page,
-        limit,
-        totalCount: 0,
-        nextCursor: null,
-      };
-    }
+      if (!isSupabaseConfigured) {
+        console.warn('Supabase not configured. Returning empty advisors.');
+        return {
+          advisors: [],
+          hasMore: false,
+          page,
+          limit,
+          totalCount: 0,
+          nextCursor: null,
+        };
+      }
 
-    try {
-      let query = supabase
-        .from('mentors')
-        .select('*, profile:profiles(*), gigs(*)', { count: 'exact' })
-        .eq('verification_status', 'approved');
-
-      if (targetSegment && targetSegment !== 'all') {
-        const canonicalSeg = await SegmentService.getSegmentBySlug(targetSegment);
-        const segId = canonicalSeg ? canonicalSeg.id : targetSegment;
-        query = supabase
+      try {
+        const baseQuery = supabase
           .from('mentors')
-          .select('*, profile:profiles(*), gigs(*), mentor_segments:mentor_segments!inner(segment_id,status)', { count: 'exact' })
+          .select('*, profile:profiles(*), gigs(*)', { count: 'exact' })
           .eq('verification_status', 'approved')
-          .eq('mentor_segments.segment_id', segId)
-          .eq('mentor_segments.status', 'active');
-      }
+          .eq('is_demo', false)
+          .eq('profile.role', 'mentor');
 
-      if (filters.minRating) {
-        query = query.gte('rating', filters.minRating);
-      }
+        let query = baseQuery;
+
+        if (targetSegment && targetSegment !== 'all') {
+          const canonicalSeg = await SegmentService.getSegmentBySlug(targetSegment);
+          const segId = canonicalSeg ? canonicalSeg.id : targetSegment;
+          query = supabase
+            .from('mentors')
+            .select('*, profile:profiles(*), gigs(*), mentor_segments:mentor_segments!inner(segment_id,status)', { count: 'exact' })
+            .eq('verification_status', 'approved')
+            .eq('is_demo', false)
+            .eq('profile.role', 'mentor')
+            .eq('mentor_segments.segment_id', segId)
+            .eq('mentor_segments.status', 'active');
+        }
+
+        if (filters.minRating) {
+          query = query.gte('rating', filters.minRating);
+        }
 
       // Range offset for max 6 items
       const from = offset;
@@ -246,18 +252,23 @@ export class AdvisorService {
     }
 
     try {
-      let query = supabase
+      const baseQuery = supabase
         .from('mentors')
         .select('*, profile:profiles(*), gigs(*)')
-        .eq('verification_status', 'approved');
+        .eq('verification_status', 'approved')
+        .eq('is_demo', false)
+        .eq('profile.role', 'mentor');
+
+      let query = baseQuery;
 
       if (targetSegment && targetSegment !== 'all') {
         const canonicalSeg = await SegmentService.getSegmentBySlug(targetSegment);
         const segId = canonicalSeg ? canonicalSeg.id : targetSegment;
-        query = supabase
-          .from('mentors')
+        query = baseQuery
           .select('*, profile:profiles(*), gigs(*), mentor_segments:mentor_segments!inner(segment_id,status)')
           .eq('verification_status', 'approved')
+          .eq('is_demo', false)
+          .eq('profile.role', 'mentor')
           .eq('mentor_segments.segment_id', segId)
           .eq('mentor_segments.status', 'active');
       }
@@ -310,28 +321,30 @@ export class AdvisorService {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('mentors')
-        .select(`
-          *,
-          profile:profiles(*),
-          gigs(*),
-          mentor_segments:mentor_segments(*),
-          reviews:reviews(
+        const { data, error } = await supabase
+          .from('mentors')
+          .select(`
             *,
-            seeker:profiles(id, full_name, avatar_url)
-          ),
-          offerings:offerings(
-            *,
-            mentor_segment:mentor_segments(
+            profile:profiles(*),
+            gigs(*),
+            mentor_segments:mentor_segments(*),
+            reviews:reviews(
               *,
-              segment:advisory_segments(*)
+              seeker:profiles(id, full_name, avatar_url)
+            ),
+            offerings:offerings(
+              *,
+              mentor_segment:mentor_segments(
+                *,
+                segment:advisory_segments(*)
+              )
             )
-          )
-        `)
-        .eq('id', id)
-        .neq('verification_status', 'suspended')
-        .single();
+          `)
+          .eq('id', id)
+          .eq('is_demo', false)
+          .eq('profile.role', 'mentor')
+          .neq('verification_status', 'suspended')
+          .single();
 
       if (error || !data) {
         console.error('Error fetching advisor:', error);
@@ -439,6 +452,8 @@ export class AdvisorService {
           )
         `)
         .eq('verification_status', 'approved')
+        .eq('is_demo', false)
+        .eq('profile.role', 'mentor')
         .order('rating', { ascending: false })
         .order('review_count', { ascending: false });
 
@@ -592,12 +607,12 @@ export class AdvisorService {
     }
 
     try {
-      const [{ count: totalCount }, { count: approvedCount }, { count: pendingCount }, { data: mentors }] = await Promise.all([
-        supabase.from('mentors').select('*', { count: 'exact', head: true }),
-        supabase.from('mentors').select('*', { count: 'exact', head: true }).eq('verification_status', 'approved'),
-        supabase.from('mentors').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
-        supabase.from('mentors').select('segment_id, verified_categories'),
-      ]);
+        const [{ count: totalCount }, { count: approvedCount }, { count: pendingCount }, { data: mentors }] = await Promise.all([
+          supabase.from('mentors').select('*', { count: 'exact', head: true }).eq('is_demo', false).eq('profile.role', 'mentor'),
+          supabase.from('mentors').select('*', { count: 'exact', head: true }).eq('verification_status', 'approved').eq('is_demo', false).eq('profile.role', 'mentor'),
+          supabase.from('mentors').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending').eq('is_demo', false).eq('profile.role', 'mentor'),
+          supabase.from('mentors').select('segment_id, verified_categories').eq('is_demo', false).eq('profile.role', 'mentor'),
+        ]);
 
       const bySegment: { [key: string]: number } = {};
       mentors?.forEach((m: { segment_id?: string; verified_categories?: string[] }) => {

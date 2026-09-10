@@ -124,7 +124,7 @@ export class DiscoveryService {
     const counts = new Map<string, number>();
     const { data, error } = await supabase
       .from('mentor_segments')
-      .select('segment_id, mentor:mentors!inner(verification_status)')
+      .select('segment_id, mentor:mentors!inner(verification_status, is_demo)')
       .eq('status', 'active');
 
     if (error) {
@@ -132,9 +132,9 @@ export class DiscoveryService {
       return counts;
     }
 
-    for (const row of (data || []) as { segment_id: string; mentor?: { verification_status: string }[] }[]) {
+    for (const row of (data || []) as { segment_id: string; mentor?: { verification_status: string; is_demo?: boolean }[] }[]) {
       const mentor = row?.mentor?.[0];
-      if (mentor?.verification_status === 'approved') {
+      if (mentor?.verification_status === 'approved' && !mentor?.is_demo) {
         const segId = row?.segment_id;
         if (segId) counts.set(segId, (counts.get(segId) || 0) + 1);
       }
@@ -153,7 +153,9 @@ export class DiscoveryService {
       .select(
         '*, profile:profiles(*), gigs(*), mentor_segments:mentor_segments!inner(mentor_id,segment_id,status)'
       )
-      .eq('verification_status', 'approved');
+      .eq('verification_status', 'approved')
+      .eq('is_demo', false)
+      .eq('profile.role', 'mentor');
 
     if (error) {
       console.error('[DiscoveryService] loadAdvisors error:', error.message);
@@ -285,7 +287,9 @@ export class DiscoveryService {
       )
       .eq('status', 'active')
       .eq('segment_id', segment.id)
-      .eq('mentor.verification_status', 'approved');
+      .eq('mentor.verification_status', 'approved')
+      .eq('mentor.is_demo', false)
+      .eq('mentor.profile.role', 'mentor');
 
     if (error) {
       console.error('[DiscoveryService] getAdvisorsForDomain error:', error.message);

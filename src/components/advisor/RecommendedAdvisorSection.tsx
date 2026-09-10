@@ -207,11 +207,8 @@ const RecommendedCard: React.FC<RecommendedCardProps> = ({ entry, segments }) =>
         {/* Profile Row */}
         <div className="flex items-start gap-4">
           <div className="relative shrink-0">
-            <img
-               src={
-                advisor.profile?.avatar_url ||
-                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-              }
+             <img
+                src={advisor.profile?.avatar_url || ''}
               alt={advisor.profile?.full_name || 'Advisor'}
               className="w-14 h-14 rounded-[18px] object-cover border border-white/10 group-hover:border-[#8052ff]/50 transition-colors"
             />
@@ -233,14 +230,14 @@ const RecommendedCard: React.FC<RecommendedCardProps> = ({ entry, segments }) =>
             <div className="flex items-center gap-1.5 text-[11px] text-[#707070] pt-0.5">
               <div className="flex items-center gap-1 text-[#ffb829]">
                 <Star className="w-3 h-3 fill-[#ffb829]" />
-                <span className="font-semibold text-white">
-                  {(advisor.rating || 5).toFixed(1)}
-                </span>
+                 <span className="font-semibold text-white">
+                   {(advisor.rating || 0).toFixed(1)}
+                 </span>
               </div>
               <span>•</span>
               <span>{advisor.review_count || 0} reviews</span>
-              <span>•</span>
-              <span>{advisor.experience_years || 5}+ yrs</span>
+               <span>•</span>
+               <span>{advisor.experience_years || 0}+ yrs</span>
             </div>
           </div>
 

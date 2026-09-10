@@ -687,79 +687,63 @@ export const SeekerDiscoverPage: React.FC = () => {
     setSelectedCategory(segmentParam);
   }, [segmentParam]);
 
-  const categories = [
-    { id: 'all', label: 'All Domains' },
-    ...segments.map((s) => ({ id: s.slug, label: s.name })),
-  ];
+   const categories = [
+     { id: 'all', label: 'All Domains' },
+     ...segments.map((s) => ({ id: s.slug, label: s.name })),
+   ];
 
-  const currentSegment = segments.find(
-    (s) => s.slug === selectedCategory || s.id === selectedCategory
-  );
+   const currentSegment = segments.find(
+     (s) => s.slug === selectedCategory || s.id === selectedCategory
+   );
 
-  const handleCategorySelect = (categoryId: string) => {
-    setSelectedCategory(categoryId);
-    if (categoryId === 'all') {
-      setSearchParams({});
-    } else {
-      setSearchParams({ segment: categoryId });
-    }
-  };
+   const handleCategorySelect = (categoryId: string) => {
+     setSelectedCategory(categoryId);
+     if (categoryId === 'all') {
+       setSearchParams({});
+     } else {
+       setSearchParams({ segment: categoryId });
+     }
+   };
 
-  const handleBookSession = (advisor: AdvisorDetail, _gig: Gig, offering?: Offering | null) => {
-    if (offering) {
-      setCheckoutAdvisor(advisor);
-      setCheckoutOffering(offering);
-    }
-  };
+   const handleBookSession = (advisor: AdvisorDetail, _gig: Gig, offering?: Offering | null) => {
+     if (offering) {
+       setCheckoutAdvisor(advisor);
+       setCheckoutOffering(offering);
+     }
+   };
 
-  return (
-    <div className="space-y-10">
-      {/* 1. Dynamic Segment Introduction & Educational Context */}
-      <SegmentIntroduction
-        segment={currentSegment || selectedCategory}
-        showTransitionBanner={true}
-      />
+   return (
+     <div className="space-y-10">
+       {/* 1. Dynamic Segment Introduction & Educational Context */}
+       <SegmentIntroduction
+         segment={currentSegment || selectedCategory}
+         showTransitionBanner={true}
+       />
 
-      {/* 2. Advisor Discovery Controls (Search & Segment Category Tabs) */}
-      <div className="space-y-3 pt-2">
-        <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-[#9a9a9a] absolute left-4 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder={`Search ${selectedCategory === 'all' ? 'all advisors' : (currentSegment?.name || selectedCategory) + ' specialists'} by topic, skill, or name...`}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-white/[0.03] border border-white/10 rounded-full pl-11 pr-4 py-2.5 text-xs text-white placeholder-[#707070] focus:outline-none focus:border-[#8052ff] transition-all"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-[#707070] hover:text-white"
-                aria-label="Clear search"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            {categories.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => handleCategorySelect(c.id)}
-                className={`px-4 py-2 rounded-full text-xs font-medium tracking-wider whitespace-nowrap uppercase transition-all ${
-                  selectedCategory === c.id
-                    ? 'bg-white/15 text-white border border-white/30 shadow-sm'
-                    : 'text-[#9a9a9a] hover:text-white border border-white/5 hover:bg-white/5'
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+       {/* 2. Advisor Discovery Controls (Search) */}
+       <div className="space-y-3 pt-2">
+         <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+           <div className="relative flex-1 max-w-md">
+             <Search className="w-4 h-4 text-[#9a9a9a] absolute left-4 top-1/2 -translate-y-1/2" />
+             <input
+               type="text"
+               placeholder={`Search ${selectedCategory === 'all' ? 'all advisors' : (currentSegment?.name || selectedCategory) + ' specialists'} by topic, skill, or name...`}
+               value={search}
+               onChange={(e) => setSearch(e.target.value)}
+               className="w-full bg-white/[0.03] border border-white/10 rounded-full pl-11 pr-4 py-2.5 text-xs text-white placeholder-[#707070] focus:outline-none focus:border-[#8052ff] transition-all"
+             />
+             {search && (
+               <button
+                 onClick={() => setSearch('')}
+                 className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-[#707070] hover:text-white"
+                 aria-label="Clear search"
+               >
+                 <X className="w-3.5 h-3.5" />
+               </button>
+             )}
+           </div>
+         </div>
+       </div>
 
        {/* 3. Recommended For You */}
       {!search && (

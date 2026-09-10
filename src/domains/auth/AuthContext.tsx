@@ -1,15 +1,29 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
 import { Profile, UserRole } from '../../lib/supabase/types';
 import { authConfig, AuthConfig } from '../../config/authConfig';
+import { MentorProfileService, MentorOnboardingState } from '../mentor/MentorProfileService';
 
-interface AuthContextType {
+export type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated' | 'missing_profile' | 'error';
+
+interface ProfileResolution {
+  status: AuthStatus;
+  profile: Profile | null;
+  role: UserRole | null;
+  mentorOnboardingState: MentorOnboardingState | null;
+  mentorOnboardingLoading: boolean;
+}
+
+export interface AuthContextType {
   user: any | null;
   profile: Profile | null;
   role: UserRole | null;
+  authStatus: AuthStatus;
   isLoading: boolean;
   isConfigured: boolean;
   config: AuthConfig;
+  mentorOnboardingState: MentorOnboardingState | null;
+  mentorOnboardingLoading: boolean;
   failedAttempts: number;
   isCooldownActive: boolean;
   cooldownSecondsRemaining: number;
@@ -18,21 +32,135 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string; message?: string }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ success: boolean; error?: string }>;
+  refreshAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const MAX_FAILED_ATTEMPTS = 5;
 const COOLDOWN_DURATION_MS = 60 * 1000;
+const USER_ROLES: UserRole[] = ['seeker', 'mentor', 'admin'];
+
+function isUserRole(value: string | null | undefined): value is UserRole {
+  return USER_ROLES.includes(value as UserRole);
+}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
+  const [mentorOnboardingState, setMentorOnboardingState] = useState<MentorOnboardingState | null>(null);
+  const [mentorOnboardingLoading, setMentorOnboardingLoading] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState<number>(0);
   const [cooldownUntil, setCooldownUntil] = useState<number>(0);
   const [cooldownSecondsRemaining, setCooldownSecondsRemaining] = useState<number>(0);
+  const requestSequence = useRef(0);
+  const mountedRef = useRef(false);
+
+  const loadProfile = async (userId: string): Promise<ProfileResolution> => {
+    try {
+      const { data: profData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profileError || !profData) {
+        return {
+          status: 'missing_profile',
+          profile: null,
+          role: null,
+          mentorOnboardingState: null,
+          mentorOnboardingLoading: false,
+        };
+      }
+
+      const resolvedProfile = profData as Profile;
+      if (!isUserRole(resolvedProfile.role)) {
+        return {
+          status: 'error',
+          profile: resolvedProfile,
+          role: null,
+          mentorOnboardingState: null,
+          mentorOnboardingLoading: false,
+        };
+      }
+
+      if (resolvedProfile.role !== 'mentor') {
+        return {
+          status: 'authenticated',
+          profile: resolvedProfile,
+          role: resolvedProfile.role,
+          mentorOnboardingState: null,
+          mentorOnboardingLoading: false,
+        };
+      }
+
+      const mentorOnboardingState = await MentorProfileService.getMentorOnboardingState(userId);
+      return {
+        status: 'authenticated',
+        profile: resolvedProfile,
+        role: resolvedProfile.role,
+        mentorOnboardingState,
+        mentorOnboardingLoading: false,
+      };
+    } catch (err: any) {
+      console.error('[Auth] Error loading profile:', err.message);
+      return {
+        status: 'error',
+        profile: null,
+        role: null,
+        mentorOnboardingState: null,
+        mentorOnboardingLoading: false,
+      };
+    }
+  };
+
+  const resolveSession = async (
+    session: { user: { id: string } } | null,
+    requestId: number
+  ) => {
+    if (!mountedRef.current || requestId !== requestSequence.current) {
+      return;
+    }
+
+    if (!session?.user) {
+      setUser(null);
+      setProfile(null);
+      setRole(null);
+      setMentorOnboardingState(null);
+      setMentorOnboardingLoading(false);
+      setAuthStatus('unauthenticated');
+      return;
+    }
+
+    setUser(session.user);
+    setProfile(null);
+    setRole(null);
+    setMentorOnboardingState(null);
+    setMentorOnboardingLoading(false);
+    setAuthStatus('loading');
+
+    const resolution = await loadProfile(session.user.id);
+    if (!mountedRef.current || requestId !== requestSequence.current) {
+      return;
+    }
+
+    setProfile(resolution.profile);
+    setRole(resolution.role);
+    setMentorOnboardingState(resolution.mentorOnboardingState);
+    setMentorOnboardingLoading(resolution.mentorOnboardingLoading);
+    setAuthStatus(resolution.status);
+  };
+
+  const refreshAuth = async () => {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error('[Auth] Refresh session error:', error.message);
+    }
+    await resolveSession(session, ++requestSequence.current);
+  };
 
   useEffect(() => {
     try {
@@ -76,13 +204,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [cooldownUntil]);
 
   useEffect(() => {
+    mountedRef.current = true;
+
     if (!isSupabaseConfigured) {
       console.error('[Auth] Supabase is not configured. Authentication is unavailable.');
       setUser(null);
       setProfile(null);
       setRole(null);
-      setIsLoading(false);
-      return;
+      setMentorOnboardingState(null);
+      setMentorOnboardingLoading(false);
+      setAuthStatus('unauthenticated');
+      return () => {
+        mountedRef.current = false;
+      };
     }
 
     const checkUser = async () => {
@@ -91,72 +225,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (sessionError) {
           console.error('[Auth] Session error:', sessionError.message);
         }
-        if (session?.user) {
-          setUser(session.user);
-          await loadProfile(session.user.id);
-        } else {
-          setUser(null);
-          setProfile(null);
-          setRole(null);
-        }
+        await resolveSession(session, ++requestSequence.current);
       } catch (err: any) {
+        if (!mountedRef.current) return;
         console.error('[Auth] Auth initialization error:', err.message);
         setUser(null);
         setProfile(null);
         setRole(null);
-      } finally {
-        setIsLoading(false);
+        setMentorOnboardingState(null);
+        setMentorOnboardingLoading(false);
+        setAuthStatus('error');
       }
     };
 
-    checkUser();
+    void checkUser();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        await loadProfile(session.user.id);
-      } else {
-        setUser(null);
-        setProfile(null);
-        setRole(null);
-      }
-      setIsLoading(false);
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      void resolveSession(session, ++requestSequence.current);
     });
 
     return () => {
+      mountedRef.current = false;
       authListener?.subscription.unsubscribe();
     };
   }, []);
 
-  const loadProfile = async (userId: string) => {
-    try {
-      const { data: profData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (profileError) {
-        console.error('[Auth] Profile load error:', profileError.message);
-        setProfile(null);
-        setRole(null);
-        return;
-      }
-
-      if (profData) {
-        setProfile(profData as Profile);
-        setRole((profData as Profile).role);
-      } else {
-        console.warn('[Auth] No profile found for user:', userId);
-        setProfile(null);
-        setRole(null);
-      }
-    } catch (err: any) {
-      console.error('[Auth] Error loading profile:', err.message);
-      setProfile(null);
-      setRole(null);
-    }
-  };
+  const isLoading = authStatus === 'loading';
 
   const recordFailedAttempt = () => {
     if (!authConfig.LOGIN_ATTEMPT_LIMIT_ENABLED) return;
@@ -211,7 +305,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    setIsLoading(true);
+    setAuthStatus('loading');
+    setMentorOnboardingLoading(false);
 
     try {
       if (password) {
@@ -221,11 +316,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         if (error) {
           recordFailedAttempt();
+          setUser(null);
+          setProfile(null);
+          setRole(null);
+          setMentorOnboardingState(null);
+          setMentorOnboardingLoading(false);
+          setAuthStatus('unauthenticated');
           throw error;
         }
         if (data.user) {
           if (authConfig.EMAIL_VERIFICATION_REQUIRED && !data.user.email_confirmed_at) {
-            setIsLoading(false);
+            setUser(null);
+            setProfile(null);
+            setRole(null);
+            setMentorOnboardingState(null);
+            setMentorOnboardingLoading(false);
+            setAuthStatus('unauthenticated');
             return {
               success: false,
               requireVerification: true,
@@ -234,20 +340,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           resetFailedAttempts();
-          setUser(data.user);
-          await loadProfile(data.user.id);
+          await resolveSession(data.session ?? { user: data.user }, ++requestSequence.current);
         }
       } else {
         const { error } = await supabase.auth.signInWithOtp({ email });
         if (error) {
           recordFailedAttempt();
+          setUser(null);
+          setProfile(null);
+          setRole(null);
+          setMentorOnboardingState(null);
+          setMentorOnboardingLoading(false);
+          setAuthStatus('unauthenticated');
           throw error;
         }
+        setAuthStatus('unauthenticated');
       }
-      setIsLoading(false);
       return { success: true };
     } catch (err: any) {
-      setIsLoading(false);
       return { success: false, error: err.message || 'Failed to sign in' };
     }
   };
@@ -270,12 +380,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    setIsLoading(true);
+    setAuthStatus('loading');
+    setMentorOnboardingLoading(false);
 
     try {
       const authPassword = password || '';
       if (!authPassword) {
-        setIsLoading(false);
+        setAuthStatus('unauthenticated');
         return { success: false, error: 'Password is required for registration.' };
       }
 
@@ -293,27 +404,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       if (error) throw error;
       if (data.user) {
-        setUser(data.user);
-        await supabase.from('profiles').upsert({
+        const { error: profileError } = await supabase.from('profiles').upsert({
           id: data.user.id,
           email,
           full_name: fullName,
           role: selectedRole,
         });
+        if (profileError) throw profileError;
+
         if (selectedRole === 'mentor') {
-          await supabase.from('mentors').upsert({
+          const { error: mentorError } = await supabase.from('mentors').upsert({
             id: data.user.id,
             headline: mentorData?.headline || 'Verified Advisor',
             bio: mentorData?.bio || '',
             verification_status: 'pending',
           });
+          if (mentorError) throw mentorError;
         }
-        await loadProfile(data.user.id);
+
+        if (authConfig.EMAIL_VERIFICATION_REQUIRED && !data.user.email_confirmed_at) {
+          setUser(null);
+          setProfile(null);
+          setRole(null);
+          setMentorOnboardingState(null);
+          setMentorOnboardingLoading(false);
+          setAuthStatus('unauthenticated');
+          return { success: true };
+        }
+
+        await resolveSession(data.session ?? { user: data.user }, ++requestSequence.current);
       }
-      setIsLoading(false);
       return { success: true };
     } catch (err: any) {
-      setIsLoading(false);
+      setAuthStatus('unauthenticated');
       return { success: false, error: err.message || 'Failed to register' };
     }
   };
@@ -352,13 +475,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    setIsLoading(true);
+    setAuthStatus('loading');
+    setMentorOnboardingLoading(false);
 
     if (!isSupabaseConfigured) {
       setUser(null);
       setProfile(null);
       setRole(null);
-      setIsLoading(false);
+      setMentorOnboardingState(null);
+      setAuthStatus('unauthenticated');
       return;
     }
 
@@ -370,7 +495,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setProfile(null);
       setRole(null);
-      setIsLoading(false);
+      setMentorOnboardingState(null);
+      setMentorOnboardingLoading(false);
+      setAuthStatus('unauthenticated');
     }
   };
 
@@ -383,10 +510,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'Application is not configured. Please contact support.' };
     }
 
+    const { id: _id, role: _role, ...safeUpdates } = updates;
+
     try {
       const { error: supabaseError } = await supabase
         .from('profiles')
-        .update(updates)
+        .update(safeUpdates)
         .eq('id', profile.id);
 
       if (supabaseError) {
@@ -394,7 +523,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: supabaseError.message };
       }
 
-      setProfile((prev) => (prev ? { ...prev, ...updates } : null));
+      setProfile((prev) => (prev ? { ...prev, ...safeUpdates } : null));
       return { success: true };
     } catch (err: any) {
       console.error('[Auth] Error updating profile:', err.message);
@@ -408,9 +537,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         profile,
         role,
+        authStatus,
         isLoading,
         isConfigured: isSupabaseConfigured,
         config: authConfig,
+        mentorOnboardingState,
+        mentorOnboardingLoading,
         failedAttempts,
         isCooldownActive,
         cooldownSecondsRemaining,
@@ -419,6 +551,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resetPassword,
         signOut,
         updateProfile,
+        refreshAuth,
       }}
     >
       {children}

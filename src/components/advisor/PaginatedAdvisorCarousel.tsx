@@ -396,10 +396,7 @@ export const PaginatedAdvisorCarousel: React.FC<PaginatedAdvisorCarouselProps> =
                     >
                       <div className="relative">
                         <img
-                          src={
-                            advisor.profile?.avatar_url ||
-                            `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`
-                          }
+                          src={advisor.profile?.avatar_url || ''}
                           alt={advisor.profile?.full_name || 'Advisor'}
                           className="w-13 h-13 sm:w-14 sm:h-14 rounded-full object-cover border border-white/10 group-hover/profile:border-white/30 transition-all"
                         />
@@ -428,9 +425,9 @@ export const PaginatedAdvisorCarousel: React.FC<PaginatedAdvisorCarouselProps> =
                             </span>
                           </div>
                           <span>•</span>
-                          <span>{advisor.review_count || 12} reviews</span>
-                          <span>•</span>
-                          <span>{advisor.experience_years || 8}+ yrs exp</span>
+                           <span>{advisor.review_count || 0} reviews</span>
+                           <span>•</span>
+                           <span>{advisor.experience_years || 0}+ yrs exp</span>
                         </div>
                       </div>
                     </Link>

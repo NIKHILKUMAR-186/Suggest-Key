@@ -197,7 +197,7 @@ const MatchedAdvisorCard: React.FC<MatchedAdvisorCardProps> = ({
         <div className="flex items-center gap-3.5">
           <div className="relative shrink-0">
             <img
-              src={avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+              src={avatar || ''}
               alt={name}
               className="w-13 h-13 rounded-full object-cover border border-white/10"
             />
@@ -213,7 +213,7 @@ const MatchedAdvisorCard: React.FC<MatchedAdvisorCardProps> = ({
             <div className="flex items-center gap-1.5 text-xs text-[#9a9a9a]">
               <div className="flex items-center gap-1 text-[#ffb829]">
                 <Star className="w-3 h-3 fill-[#ffb829]" />
-                <span className="font-semibold text-white">{(advisor.rating || 5).toFixed(1)}</span>
+                 <span className="font-semibold text-white">{(advisor.rating || 0).toFixed(1)}</span>
               </div>
               <span>•</span>
               <span>{advisor.review_count || 0} reviews</span>

@@ -2,6 +2,14 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
 import { Mentor, MentorSegment, Profile } from '../../lib/supabase/types';
 import { AdvisorySegment } from '../../domains/segment/SegmentTypes';
 
+export interface MentorOnboardingState {
+  mentorExists: boolean;
+  isComplete: boolean;
+  primarySegmentId: string | null;
+  activeSegmentIds: string[];
+  error?: string;
+}
+
 export interface MentorProfileDetail {
   id: string;
   headline: string;
@@ -241,6 +249,160 @@ export class MentorProfileService {
     } catch (err) {
       console.error('Error in isMentorInSegment:', err);
       return false;
+    }
+  }
+
+  static async getMentorOnboardingState(mentorId: string): Promise<MentorOnboardingState> {
+    if (!isSupabaseConfigured) {
+      return {
+        mentorExists: false,
+        isComplete: false,
+        primarySegmentId: null,
+        activeSegmentIds: [],
+        error: 'Supabase not configured',
+      };
+    }
+
+    try {
+      const { data: mentorData, error: mentorError } = await supabase
+        .from('mentors')
+        .select('id, headline, bio, primary_segment_id')
+        .eq('id', mentorId)
+        .single();
+
+      if (mentorError || !mentorData) {
+        return {
+          mentorExists: false,
+          isComplete: false,
+          primarySegmentId: null,
+          activeSegmentIds: [],
+          error: mentorError?.message || 'Mentor profile not found',
+        };
+      }
+
+      const { data: segmentRows, error: segmentError } = await supabase
+        .from('mentor_segments')
+        .select('segment_id, display_order')
+        .eq('mentor_id', mentorId)
+        .eq('status', 'active')
+        .order('display_order', { ascending: true });
+
+      if (segmentError) {
+        return {
+          mentorExists: true,
+          isComplete: false,
+          primarySegmentId: null,
+          activeSegmentIds: [],
+          error: segmentError.message,
+        };
+      }
+
+      const activeSegmentIds = (segmentRows || [])
+        .map((row) => row.segment_id)
+        .filter((segmentId): segmentId is string => Boolean(segmentId));
+      const primarySegmentId =
+        mentorData.primary_segment_id && activeSegmentIds.includes(mentorData.primary_segment_id)
+          ? mentorData.primary_segment_id
+          : segmentRows?.find((row) => row.display_order === 0)?.segment_id ||
+            segmentRows?.[0]?.segment_id ||
+            null;
+      const isComplete = Boolean(
+        mentorData.headline?.trim() && mentorData.bio?.trim() && primarySegmentId
+      );
+
+      return {
+        mentorExists: true,
+        isComplete,
+        primarySegmentId,
+        activeSegmentIds,
+      };
+    } catch (err) {
+      return {
+        mentorExists: false,
+        isComplete: false,
+        primarySegmentId: null,
+        activeSegmentIds: [],
+        error: err instanceof Error ? err.message : 'Failed to load mentor onboarding state',
+      };
+    }
+  }
+
+  static async setPrimarySegment(
+    mentorId: string,
+    segmentId: string
+  ): Promise<{ success: boolean; state?: MentorOnboardingState; error?: string }> {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: 'Supabase not configured' };
+    }
+
+    if (!mentorId || !segmentId) {
+      return { success: false, error: 'Mentor and segment identifiers are required' };
+    }
+
+    try {
+      const { data: segment, error: segmentError } = await supabase
+        .from('advisory_segments')
+        .select('id')
+        .eq('id', segmentId)
+        .eq('is_active', true)
+        .single();
+
+      if (segmentError || !segment) {
+        return { success: false, error: 'Selected segment is not active' };
+      }
+
+      const { error: upsertError } = await supabase
+        .from('mentor_segments')
+        .upsert(
+          {
+            mentor_id: mentorId,
+            segment_id: segmentId,
+            status: 'active',
+            display_order: 0,
+          },
+          { onConflict: 'mentor_id,segment_id' }
+        );
+
+      if (upsertError) {
+        return { success: false, error: upsertError.message };
+      }
+
+      const { error: reorderError } = await supabase
+        .from('mentor_segments')
+        .update({ display_order: 1 })
+        .eq('mentor_id', mentorId)
+        .neq('segment_id', segmentId);
+
+      if (reorderError) {
+        return { success: false, error: reorderError.message };
+      }
+
+      const { error: selectedError } = await supabase
+        .from('mentor_segments')
+        .update({ status: 'active', display_order: 0 })
+        .eq('mentor_id', mentorId)
+        .eq('segment_id', segmentId);
+
+      if (selectedError) {
+        return { success: false, error: selectedError.message };
+      }
+
+      const { error: mentorError } = await supabase
+        .from('mentors')
+        .update({ primary_segment_id: segmentId })
+        .eq('id', mentorId);
+
+      if (mentorError) {
+        return { success: false, error: mentorError.message };
+      }
+
+      const state = await this.getMentorOnboardingState(mentorId);
+      return { success: true, state };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to save primary segment',
+      };
     }
   }
 }

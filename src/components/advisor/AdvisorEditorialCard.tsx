@@ -63,7 +63,7 @@ export const AdvisorEditorialCard: React.FC<AdvisorEditorialCardProps> = ({
         <div className="flex items-start gap-5">
           <Link to={`/mentor/${advisor.id}`} className="shrink-0 relative">
             <img
-              src={advisor.profile?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'}
+              src={advisor.profile?.avatar_url || ''}
               alt={advisor.profile?.full_name || 'Advisor'}
               className="w-16 h-16 sm:w-20 sm:h-20 rounded-[22px] object-cover border border-white/10 group-hover:border-[#8052ff]/50 transition-colors"
             />
@@ -95,7 +95,7 @@ export const AdvisorEditorialCard: React.FC<AdvisorEditorialCardProps> = ({
 
             {creds.isVerified && creds.displayLine && (
               <p className="text-[11px] text-[#9a9a9a] leading-tight line-clamp-1">
-                {creds.displayLine} • {advisor.experience_years || 5}+ yrs practice
+                {creds.displayLine} • {advisor.experience_years || 0}+ yrs practice
               </p>
             )}
           </div>
@@ -124,7 +124,7 @@ export const AdvisorEditorialCard: React.FC<AdvisorEditorialCardProps> = ({
         <div className="flex items-center justify-between py-2.5 px-4 rounded-xl bg-white/[0.02] border border-white/5 text-xs">
           <div className="flex items-center gap-1.5 text-[#ffb829]">
             <Star className="w-3.5 h-3.5 fill-[#ffb829]" />
-            <span className="font-semibold">{(advisor.rating || 5).toFixed(2)}</span>
+            <span className="font-semibold">{(advisor.rating || 0).toFixed(2)}</span>
             <span className="text-[#9a9a9a]">({advisor.review_count || 0} verified reviews)</span>
           </div>
           <span className="text-xs text-[#9a9a9a]">

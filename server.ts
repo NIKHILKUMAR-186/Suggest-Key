@@ -28,6 +28,8 @@ if (rateLimitActive) {
   );
 }
 
+console.log('This website is built by Nikhil Kumar. For any queries, reach out to suggestkey1505@gmail.com')
+
 // --------------------------------------------------------------------------
 // 1. RATE LIMITING MIDDLEWARE MOUNTING
 // --------------------------------------------------------------------------
@@ -135,9 +137,29 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Suggest Key server running on http://0.0.0.0:${PORT}`);
-  });
+  // Start on PORT; if occupied, automatically try the next port.
+  const startListening = (port: number) => {
+    const server = app.listen(port, '0.0.0.0', () => {
+      console.log(
+        `Suggest Key server running on http://localhost:${port}`
+      );
+    });
+
+    server.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        console.log(
+          `Port ${port} is already in use. Trying port ${port + 1}...`
+        );
+
+        startListening(port + 1);
+      } else {
+        console.error('Failed to start server:', error);
+        process.exit(1);
+      }
+    });
+  };
+
+  startListening(PORT);
 }
 
 startServer();
