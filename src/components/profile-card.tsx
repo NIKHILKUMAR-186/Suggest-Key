@@ -1,0 +1,87 @@
+import { Link } from "@tanstack/react-router";
+import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
+import { ChevronRight } from "lucide-react";
+import type { AuthSession } from "@/hooks/use-auth";
+import { formatUserReferenceNo } from "@/lib/auth";
+import { useEffect, useState } from "react";
+
+interface ProfileCardProps {
+  auth: AuthSession | undefined;
+  collapsed: boolean;
+  settingsPath?: string;
+}
+
+export function ProfileCard({ auth, collapsed, settingsPath = "/settings" }: ProfileCardProps) {
+  const [prefersReduced, setPrefersReduced] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setPrefersReduced(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefersReduced(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  return (
+    <Link
+      to={settingsPath}
+      className={cn(
+        "group relative block rounded-2xl transition-all duration-200",
+        collapsed ? "mx-auto p-1" : "mx-2 p-2",
+      )}
+      aria-label="View profile settings"
+    >
+      <motion.div
+        className={cn(
+          "flex items-center gap-3 rounded-xl p-2 transition-all duration-200",
+          "hover:bg-primary-soft",
+          collapsed && "justify-center",
+        )}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+      >
+        <div className="relative shrink-0">
+          <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-brand-gradient text-xs font-bold text-white shadow-card">
+            {auth?.profile?.avatar_url ? (
+              <img
+                src={auth.profile.avatar_url}
+                alt={auth?.profile?.full_name ?? "Profile"}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span className="text-sm">
+                {auth?.profile?.full_name?.charAt(0)?.toUpperCase() ?? "U"}
+              </span>
+            )}
+          </div>
+          <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3">
+            {!prefersReduced && (
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-jelly-green opacity-75" />
+            )}
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-jelly-green ring-1 ring-white" />
+          </span>
+        </div>
+
+        {!collapsed && (
+          <motion.div
+            className="min-w-0 flex-1"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            <div className="truncate text-sm font-semibold leading-tight text-foreground">
+              {auth?.profile?.full_name ?? "User"}
+            </div>
+            <div className="truncate text-xs text-muted-foreground">{auth?.user?.email ?? ""}</div>
+          </motion.div>
+        )}
+
+        {!collapsed && (
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0.5" />
+        )}
+      </motion.div>
+    </Link>
+  );
+}

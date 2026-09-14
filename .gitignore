@@ -1,7 +1,14 @@
 node_modules/
 build/
 dist/
+*.agents/
+*.claude/
+*.kilo/
+
 coverage/
+.agents/
+.claude/
+.kilo/
 .DS_Store
 *.log
 .playwright-mcp/

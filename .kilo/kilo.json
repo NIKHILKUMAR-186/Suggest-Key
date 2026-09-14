@@ -26,7 +26,8 @@
       ],
       "environment": {
         "DEFAULT_MINIMUM_TOKENS": "6000"
-      }
+      },
+      "enabled": true
     },
     "sequentialthinking": {
       "type": "local",

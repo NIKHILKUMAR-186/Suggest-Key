@@ -1,56 +1,53 @@
-import React from 'react';
+import * as React from "react";
+import * as TabsPrimitive from "@radix-ui/react-tabs";
 
-export interface TabItem {
-  id: string;
-  label: string;
-  count?: number;
-}
+import { cn } from "@/lib/utils";
 
-export interface TabsProps {
-  tabs: TabItem[];
-  activeTab: string;
-  onChange: (tabId: string) => void;
-  className?: string;
-}
+const Tabs = TabsPrimitive.Root;
 
-export const Tabs: React.FC<TabsProps> = ({
-  tabs,
-  activeTab,
-  onChange,
-  className = '',
-}) => {
-  return (
-    <div className={`flex items-center gap-2 border-b border-white/10 overflow-x-auto no-scrollbar ${className}`}>
-      {(tabs || []).map((tab) => {
-        const isActive = activeTab === tab.id;
-        return (
-          <button
-            key={tab.id}
-            onClick={() => onChange(tab.id)}
-            className={`pb-3 px-3 text-xs font-semibold uppercase tracking-wider transition-all relative whitespace-nowrap flex items-center gap-2 ${
-              isActive
-                ? 'text-white'
-                : 'text-[#9a9a9a] hover:text-white/80'
-            }`}
-          >
-            <span>{tab.label}</span>
-            {typeof tab.count === 'number' && (
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                  isActive
-                    ? 'bg-[#8052ff] text-white'
-                    : 'bg-white/10 text-[#9a9a9a]'
-                }`}
-              >
-                {tab.count}
-              </span>
-            )}
-            {isActive && (
-              <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#8052ff] rounded-t-full" />
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
-};
+const TabsList = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.List
+    ref={ref}
+    className={cn(
+      "inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground",
+      className,
+    )}
+    {...props}
+  />
+));
+TabsList.displayName = TabsPrimitive.List.displayName;
+
+const TabsTrigger = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Trigger
+    ref={ref}
+    className={cn(
+      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
+      className,
+    )}
+    {...props}
+  />
+));
+TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
+
+const TabsContent = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Content
+    ref={ref}
+    className={cn(
+      "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      className,
+    )}
+    {...props}
+  />
+));
+TabsContent.displayName = TabsPrimitive.Content.displayName;
+
+export { Tabs, TabsList, TabsTrigger, TabsContent };

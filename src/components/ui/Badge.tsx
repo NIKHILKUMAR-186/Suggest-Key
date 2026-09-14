@@ -1,57 +1,32 @@
-import React from 'react';
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 
-export interface BadgeProps {
-  children: React.ReactNode;
-  variant?: 'iris' | 'amber' | 'verdant' | 'neutral' | 'rose';
-  size?: 'sm' | 'md';
-  className?: string;
-  color?: string;
-  icon?: React.ReactNode;
+import { cn } from "@/lib/utils";
+
+const badgeVariants = cva(
+  "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  {
+    variants: {
+      variant: {
+        default: "border-transparent bg-primary text-primary-foreground shadow hover:bg-primary/80",
+        secondary:
+          "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        destructive:
+          "border-transparent bg-destructive text-destructive-foreground shadow hover:bg-destructive/80",
+        outline: "text-foreground",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  },
+);
+
+export interface BadgeProps
+  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {}
+
+function Badge({ className, variant, ...props }: BadgeProps) {
+  return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
 }
 
-export const Badge: React.FC<BadgeProps> = ({
-  children,
-  variant = 'neutral',
-  size = 'sm',
-  className = '',
-  color,
-  icon,
-}) => {
-  const baseStyles = 'inline-flex items-center gap-1 font-semibold uppercase tracking-wider rounded-full border';
-
-  const sizeStyles = {
-    sm: 'text-[10px] px-2.5 py-0.5',
-    md: 'text-xs px-3 py-1',
-  };
-
-  const variantStyles = {
-    iris: 'border-[#8052ff]/30 bg-[#8052ff]/10 text-[#8052ff]',
-    amber: 'border-[#ffb829]/30 bg-[#ffb829]/10 text-[#ffb829]',
-    verdant: 'border-[#15846e]/30 bg-[#15846e]/10 text-[#15846e]',
-    neutral: 'border-white/10 bg-white/5 text-[#9a9a9a]',
-    rose: 'border-rose-500/30 bg-rose-500/10 text-rose-400',
-  };
-
-  if (color) {
-    return (
-      <span
-        className={`${baseStyles} ${sizeStyles[size]} ${className}`}
-        style={{
-          color: color,
-          borderColor: `${color}40`,
-          backgroundColor: `${color}15`,
-        }}
-      >
-        {icon && icon}
-        {children}
-      </span>
-    );
-  }
-
-  return (
-    <span className={`${baseStyles} ${sizeStyles[size]} ${variantStyles[variant]} ${className}`}>
-      {icon && icon}
-      {children}
-    </span>
-  );
-};
+export { Badge, badgeVariants };

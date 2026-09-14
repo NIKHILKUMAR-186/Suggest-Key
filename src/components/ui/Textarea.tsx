@@ -1,35 +1,21 @@
-import React from 'react';
+import * as React from "react";
 
-export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
-  label?: string;
-  error?: string;
-  helperText?: string;
-}
+import { cn } from "@/lib/utils";
 
-export const Textarea: React.FC<TextareaProps> = ({
-  label,
-  error,
-  helperText,
-  className = '',
-  rows = 4,
-  ...props
-}) => {
-  return (
-    <div className="space-y-1.5 w-full">
-      {label && (
-        <label className="block text-xs uppercase tracking-wider text-[#9a9a9a] font-medium">
-          {label}
-        </label>
-      )}
+const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<"textarea">>(
+  ({ className, ...props }, ref) => {
+    return (
       <textarea
-        rows={rows}
-        className={`w-full px-4 py-3 bg-white/[0.04] border ${
-          error ? 'border-rose-500/50 focus:border-rose-500' : 'border-white/10 focus:border-[#8052ff]'
-        } rounded-2xl text-white placeholder:text-[#9a9a9a]/40 text-sm focus:outline-none transition-colors duration-200 resize-none ${className}`}
+        className={cn(
+          "flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          className,
+        )}
+        ref={ref}
         {...props}
       />
-      {error && <p className="text-xs text-rose-400">{error}</p>}
-      {helperText && !error && <p className="text-xs text-[#9a9a9a]">{helperText}</p>}
-    </div>
-  );
-};
+    );
+  },
+);
+Textarea.displayName = "Textarea";
+
+export { Textarea };
