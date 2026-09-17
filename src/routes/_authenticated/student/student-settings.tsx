@@ -11,6 +11,7 @@ import { Settings as SettingsIcon, Bell, Lock, Globe, Eye } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTheme, type ThemeMode } from "@/hooks/use-theme";
 
 const initialStudentValues: ProfileEditorValues = {
   full_name: "",
@@ -44,6 +45,7 @@ export const Route = createFileRoute("/_authenticated/student/student-settings")
 
 export function StudentSettingsPage() {
   const { data: auth } = useAuth();
+  const { mode: themeMode, setMode: setThemeMode } = useTheme();
   const qc = useQueryClient();
   const userId = auth?.user?.id;
   const { data: notificationPrefs, isLoading: prefsLoading } = useNotificationPreferences(
@@ -139,15 +141,24 @@ export function StudentSettingsPage() {
     if (!auth?.user?.email) return;
     setResettingPassword(true);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(auth.user.email);
-    setResettingPassword(false);
-
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      const response = await fetch("/api/auth/password-reset/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: auth.user.email }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        toast.error("We couldn't send the reset code. Please try again.");
+        return;
+      }
+      toast.success(`Password reset code sent to ${auth.user.email}`);
+    } catch (error) {
+      console.error("Password reset request failed", error);
+      toast.error("We couldn't send the reset code. Please try again.");
+    } finally {
+      setResettingPassword(false);
     }
-
-    toast.success(`Password reset email sent to ${auth.user.email}`);
   }
 
   if (!auth?.user) {
@@ -290,26 +301,23 @@ export function StudentSettingsPage() {
             <div>
               <h2 className="text-xl font-semibold mb-4">Appearance & locale</h2>
               <div className="space-y-4">
-                {/* <div className="rounded-lg border border-border p-6">
+                <div className="rounded-lg border border-border p-6">
                   <h3 className="text-lg font-semibold">Theme</h3>
                   <p className="text-sm text-muted-foreground mt-2">
                     Choose light, dark, or follow system preference.
                   </p>
                   <div className="mt-4">
                     <select
-                      value={localStorage.getItem("theme") || "system"}
-                      onChange={(e: any) => {
-                        localStorage.setItem("theme", e.target.value);
-                        window.location.reload();
-                      }}
-                      className="rounded-md border px-2 py-1"
+                      value={themeMode}
+                      onChange={(e) => setThemeMode(e.target.value as ThemeMode)}
+                      className="rounded-md border border-border bg-input px-2 py-1 text-foreground"
                     >
                       <option value="system">System</option>
                       <option value="light">Light</option>
                       <option value="dark">Dark</option>
                     </select>
                   </div>
-                </div> */}
+                </div>
 
                 <div className="rounded-lg border border-border p-6">
                   <h3 className="text-lg font-semibold">Language</h3>

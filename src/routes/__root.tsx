@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import ErrorBoundary from "@/components/error-boundary";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/hooks/use-theme";
 
 function NotFoundComponent() {
   return (
@@ -98,6 +99,7 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        <script src="/theme-early.js" />
       </head>
       <body>
         {children}
@@ -122,10 +124,12 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
       <ErrorBoundary>
         <Outlet />
         <Toaster richColors position="top-right" />
       </ErrorBoundary>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

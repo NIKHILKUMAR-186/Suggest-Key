@@ -48,8 +48,8 @@ export function ProfileCompletion({ values, mode, onImprove }: ProfileCompletion
   }));
 
   const color = percent >= 80 ? "bg-emerald-500" : percent >= 50 ? "bg-amber-500" : "bg-red-500";
-  const textColor = percent >= 80 ? "text-emerald-700" : percent >= 50 ? "text-amber-700" : "text-red-700";
-  const bgColor = percent >= 80 ? "bg-emerald-50" : percent >= 50 ? "bg-amber-50" : "bg-red-50";
+  const textColor = percent >= 80 ? "text-emerald-700 dark:text-emerald-400" : percent >= 50 ? "text-amber-700 dark:text-amber-400" : "text-red-700 dark:text-red-400";
+  const bgColor = percent >= 80 ? "bg-emerald-50 dark:bg-emerald-500/10" : percent >= 50 ? "bg-amber-50 dark:bg-amber-500/10" : "bg-red-50 dark:bg-red-500/10";
 
   return (
     <div className="rounded-xl border border-border/60 bg-card p-5">

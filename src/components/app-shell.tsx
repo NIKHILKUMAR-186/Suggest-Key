@@ -45,15 +45,16 @@ import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { SidebarItem } from "@/components/sidebar-item";
 import { ProfileCard } from "@/components/profile-card";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useStudentLearningState } from "@/hooks/use-student-learning-state";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { isStudent } from "@/lib/authorization";
 
 const MENTOR_ITEMS = [
-  { title: "Dashboard", to: "/mentor/dashboard", icon: LayoutDashboard },
-  { title: "Calendar & Requests", to: "/mentor/calendar", icon: CalendarDays },
-  { title: "Sessions", to: "/mentor/sessions", icon: History },
-  { title: "Resources", to: "/mentor/resources", icon: BookOpenText },
+  { title: "Home", to: "/mentor/dashboard", icon: LayoutDashboard },
+  { title: "My Sessions", to: "/mentor/sessions", icon: CalendarClock },
+  { title: "Notifications", to: "/mentor/notifications", icon: Bell },
+  { title: "Settings", to: "/mentor/settings", icon: Settings },
 ] as const;
 
 interface AdminNavItem {
@@ -353,6 +354,7 @@ export function AppShell({
           <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-lg">
             <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
             <div className="flex-1" />
+            <ThemeToggle />
             {variant === "student" && (
               <TooltipProvider>
                 <Tooltip>

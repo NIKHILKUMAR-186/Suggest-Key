@@ -288,20 +288,20 @@ export function AdminBookingsPage() {
     switch (status) {
       case "completed":
       case "confirmed":
-        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+        return "badge-success border";
       case "cancelled":
-        return "bg-red-50 text-red-700 border-red-200";
+        return "badge-danger border";
       case "no_show":
       case "rejected":
-        return "bg-orange-50 text-orange-700 border-orange-200";
+        return "badge-warning border";
       case "mentor_assigned":
       case "pending_mentor_response":
-        return "bg-blue-50 text-blue-700 border-blue-200";
+        return "badge-info border";
       case "awaiting_mentor":
       case "pending_admin_assignment":
-        return "bg-amber-50 text-amber-700 border-amber-200";
+        return "badge-warning border";
       default:
-        return "bg-gray-50 text-gray-700 border-gray-200";
+        return "badge-neutral border";
     }
   };
 
@@ -446,7 +446,7 @@ export function AdminBookingsPage() {
             <TabsTrigger key={t.key} value={t.key} className="relative">
               {t.label}
               {alertForTab(t.key) && (
-                <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-xs text-red-700">
+                <span className="ml-1.5 rounded-full badge-danger px-1.5 py-0.5 text-xs">
                   {alertForTab(t.key)!.count}
                 </span>
               )}

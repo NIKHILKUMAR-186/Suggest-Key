@@ -28,7 +28,7 @@ function SubscriptionBadge({ student }: { student: StudentRow }) {
   if (sub.is_current_active) {
     return (
       <div className="flex flex-col items-start gap-1">
-        <Badge className="text-xs bg-green-100 text-green-700 border border-green-200">Active</Badge>
+        <Badge className="text-xs badge-success border">Active</Badge>
         <span className="text-xs text-muted-foreground">{sub.plan_name || "Plan"}</span>
       </div>
     );

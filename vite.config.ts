@@ -22,7 +22,16 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(__dirname, 'src'),
+        'node:async_hooks': path.resolve(__dirname, 'src/shims/async_hooks.ts'),
+      },
+    },
+    optimizeDeps: {
+      exclude: ['@tanstack/start-storage-context'],
+    },
+    build: {
+      commonjsOptions: {
+        include: [/@tanstack\/start-storage-context/, /node_modules/],
       },
     },
     server: {

@@ -38,7 +38,7 @@ export function GoogleButton({
       variant={variant}
       onClick={handleClick}
       disabled={disabled || isActive}
-      className={`group relative w-full h-12 rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-800 shadow-sm transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-70 disabled:shadow-none disabled:active:scale-100 ${className}`}
+      className={`group relative w-full h-12 rounded-xl border border-border bg-card px-4 text-[15px] font-medium text-foreground shadow-sm transition-all duration-200 hover:bg-accent hover:text-accent-foreground hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-70 disabled:shadow-none disabled:active:scale-100 ${className}`}
     >
       <span className="inline-flex items-center justify-center gap-2.5">
         {isActive ? (

@@ -207,6 +207,95 @@
   --sidebar-ring: oklch(0.72 0.17 265);
 }
 
+/* Semantic status badge utilities (theme-aware: light + dark). */
+.badge-success {
+  background-color: #e6faf0;
+  color: #0b7a4b;
+  border-color: #b9f0d4;
+}
+.dark .badge-success {
+  background-color: rgb(17 238 146 / 0.14);
+  color: #52f0aa;
+  border-color: rgb(17 238 146 / 0.3);
+}
+.badge-warning {
+  background-color: #fdf1c7;
+  color: #8a5a08;
+  border-color: #fbe49a;
+}
+.dark .badge-warning {
+  background-color: rgb(250 204 21 / 0.12);
+  color: #fbc22c;
+  border-color: rgb(250 204 21 / 0.3);
+}
+.badge-danger {
+  background-color: #fde5e5;
+  color: #b32222;
+  border-color: #f8cccc;
+}
+.dark .badge-danger {
+  background-color: rgb(248 113 113 / 0.12);
+  color: #f98d8d;
+  border-color: rgb(248 113 113 / 0.3);
+}
+.badge-info {
+  background-color: #e1edff;
+  color: #1c56c9;
+  border-color: #c3dcfb;
+}
+.dark .badge-info {
+  background-color: rgb(96 165 250 / 0.12);
+  color: #7fb3fa;
+  border-color: rgb(96 165 250 / 0.3);
+}
+.badge-neutral {
+  background-color: #eef2f6;
+  color: #4b5765;
+  border-color: #dde4ec;
+}
+.dark .badge-neutral {
+  background-color: rgb(148 163 184 / 0.12);
+  color: #a3b0c0;
+  border-color: rgb(148 163 184 / 0.3);
+}
+.badge-purple {
+  background-color: #f1e8ff;
+  color: #6d28d9;
+  border-color: #e0d0fc;
+}
+.dark .badge-purple {
+  background-color: rgb(167 139 250 / 0.12);
+  color: #b9a4fb;
+  border-color: rgb(167 139 250 / 0.3);
+}
+
+/* Glass utilities: dark variants for dark mode. */
+.dark .glass {
+  background: rgb(0 0 0 / 0.45);
+  border-color: rgb(255 255 255 / 0.12);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.35);
+}
+.dark .glass-subtle {
+  background: rgb(0 0 0 / 0.3);
+  border-color: rgb(255 255 255 / 0.08);
+}
+.dark .glass-strong {
+  background: rgb(0 0 0 / 0.6);
+  border-color: rgb(255 255 255 / 0.15);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.45);
+}
+
+/* Smooth theme transition, applied only while switching (see ThemeProvider). */
+@media (prefers-reduced-motion: no-preference) {
+  .theme-transition,
+  .theme-transition *,
+  .theme-transition *::before,
+  .theme-transition *::after {
+    transition-property: background-color, border-color, color, fill, stroke, box-shadow !important;
+    transition-duration: 180ms !important;
+    transition-timing-function: ease !important;
+  }
+}
 @layer base {
   * {
     border-color: var(--color-border);

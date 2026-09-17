@@ -1,393 +1,194 @@
-import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Loader2, GraduationCap, Briefcase, ArrowRight } from "lucide-react";
+import { Loader2, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getDashboardRoute, getActiveRole, waitForSessionRestored, type AppRole } from "@/lib/auth";
+import { getActiveRole, getDashboardRoute, waitForSessionRestored, type AppRole } from "@/lib/auth";
 import { GoogleButton } from "@/components/auth/google-button";
 import { signInWithGoogle } from "@/lib/google-auth";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const searchSchema = z.object({
-  mode: z.enum(["login", "signup"]).default("login").catch("login"),
+  mode: z.enum(["login", "signup", "signup-verify", "forgot", "reset-verify", "reset-complete", "complete-google"]).default("login").catch("login"),
+  otpId: z.string().optional(),
+  email: z.string().optional(),
 });
 
-type AuthMode = "login" | "signup";
+type AuthMode = "login" | "signup" | "signup-verify" | "forgot" | "reset-verify" | "reset-complete" | "complete-google";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: searchSchema,
-  beforeLoad: async () => {
+  beforeLoad: async ({ search }) => {
+    if (search.mode === "signup-verify") return;
+    if (search.mode === "reset-verify") return;
+    if (search.mode === "reset-complete") return;
+    if (search.mode === "complete-google") return;
     const user = await waitForSessionRestored(4000, 250);
     if (!user) return;
 
-    const [{ data: roles }] = await Promise.all([
-      supabase.from("user_roles").select("role").eq("user_id", user.id),
-    ]);
+    const { data: roles, error: rolesError } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id);
+
+    if (rolesError) {
+      console.error("Role lookup failed", rolesError);
+      toast.error("Unable to determine your account role. Please try signing in again.");
+      return;
+    }
 
     const fetchedRoles = (roles ?? []).map((roleRow) => roleRow.role as AppRole);
-    const destination = getDashboardRoute(getActiveRole(fetchedRoles));
+    const activeRole = getActiveRole(fetchedRoles);
+    if (!activeRole) return;
 
+    const destination = getDashboardRoute(activeRole);
     throw redirect({ to: destination });
   },
   head: () => ({
     meta: [
-      { title: "Sign in — Lingua" },
-      {
-        name: "description",
-        content: "Log in or create your Lingua account to start learning or teaching.",
-      },
-      { property: "og:title", content: "Sign in — Lingua" },
-      { property: "og:description", content: "Log in or create your Lingua account." },
+      { title: "Sign in — Suggest Key" },
+      { name: "description", content: "Log in or create your Suggest Key account to find or offer help." },
+      { property: "og:title", content: "Sign in — Suggest Key" },
+      { property: "og:description", content: "Log in or create your Suggest Key account." },
     ],
   }),
   component: AuthPage,
 });
 
 function AuthPage() {
-  const { mode } = Route.useSearch();
+  const search = Route.useSearch();
+  const mode = search.mode;
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [loading, setLoading] = useState(false);
   const [formMode, setFormMode] = useState<AuthMode>(mode);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
 
-  async function goToDashboardFor(userId: string) {
-    await qc.invalidateQueries();
-    const { data: roles, error: rolesError } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-
-    if (rolesError) {
-      console.error("Redirect lookup failed", rolesError);
-    }
-
-    const fetchedRoles = (roles ?? []).map((r) => r.role as AppRole);
-    const destination = getDashboardRoute(getActiveRole(fetchedRoles));
-
-    navigate({ to: destination });
-  }
-
-  async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!email || !password) {
-      toast.error("Enter your email and password to continue.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      if (!data.user) throw new Error("Login succeeded, but no user session was returned.");
-      toast.success("Welcome back!");
-      await goToDashboardFor(data.user.id);
-    } catch (error) {
-      console.error("Login failed", error);
-      toast.error(error instanceof Error ? error.message : "Login failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function waitForSession(maxWaitMs = 8000): Promise<boolean> {
-    const start = Date.now();
-    while (Date.now() - start < maxWaitMs) {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession();
-      if (error) throw error;
-      if (session?.access_token) return true;
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    }
-    return false;
-  }
-
-  async function handleSignup(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!fullName.trim() || !email || !password) {
-      toast.error("Fill in your name, email, and password to continue.");
-      return;
-    }
-
-    if (password.length < 6) {
-      toast.error("Choose a stronger password with at least 6 characters.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const emailRedirectTo = `${window.location.origin}/student/demo-session`;
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo,
-          data: { full_name: fullName, intended_role: "student" },
-        },
-      });
-
-      if (error) throw error;
-      if (!data.user) throw new Error("Signup completed without returning a user.");
-
-      if (!data.session) {
-        toast.success("Check your inbox to confirm your account.");
-        return;
-      }
-
-      const hasSession = await waitForSession();
-      if (!hasSession) {
-        toast.success("Check your inbox to confirm your account.");
-        navigate({ to: "/student/demo-session" });
-        return;
-      }
-
-      const roleRows: { user_id: string; role: "student" }[] = [
-        { user_id: data.user.id, role: "student" },
-      ];
-
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .upsert(roleRows, { onConflict: "user_id,role" });
-      if (roleError) throw roleError;
-
-      toast.success("Account created!");
-      navigate({ to: "/student/demo-session" });
-    } catch (error) {
-      console.error("Signup failed", error);
-      toast.error(getSignupErrorMessage(error));
-    } finally {
-      setLoading(false);
-    }
-  }
+  const switchMode = useCallback(
+    (newMode: AuthMode, extra: { otpId?: string; email?: string } = {}) => {
+      setFormMode(newMode);
+      navigate({ to: "/auth", search: { mode: newMode, ...extra } });
+    },
+    [navigate],
+  );
 
   return (
-    <div className="min-h-screen bg-hero-gradient/10 px-4 py-10 ">
-      <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1.3fr_1fr]">
-        <section className="rounded-[2rem] bg-hero-gradient from-slate-950 via-slate-900 to-slate-800 p-12 text-white shadow-2xl shadow-slate-950/20">
-          <div className="max-w-xl ">
-            <div className="mb-6 inline-flex items-center gap-2 h-11 w-18 rounded-full text-m uppercase tracking-[0.24em] text-white/80">
-              <img src="/logo.png" alt="LINGUA" className="h-15 w-20" />
-              <p className="bg-gradient">LINGUA</p>
-            </div>
-            <h1 className="text-5xl font-display tracking-tight text-white">
-              Learn, teach, and grow in one elegant language platform.
-            </h1>
-            <p className="mt-6 max-w-md text-lg leading-8 text-slate-300">
-              Choose your path — learn a new language or share your expertise as a mentor.
-            </p>
-            <div className="mt-10 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-                <p className="text-sm uppercase tracking-[0.2em] text-slate-900">For learners</p>
-                <p className="mt-3 text-base text-slate-100">
-                  Book 1-on-1 sessions with verified native mentors.
-                </p>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-                <p className="text-sm uppercase tracking-[0.2em] text-slate-900">For mentors</p>
-                <p className="mt-3 text-base text-slate-100">
-                  Teach your language and earn up to 90% per session.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <div className="space-y-6">
-          {/* ── Two clearly separated options ── */}
-          <div className="grid gap-4">
-            {/* <Card className="border-primary/30 bg-primary/5">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-                      <GraduationCap className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">I want to Learn</h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Create a student account and start learning with verified mentors.
-                      </p>
-                    </div>
-                  </div>
-                  <Button asChild size="sm" className="shrink-0">
-                    <Link to="/auth" search={{ mode: "signup" } as never}>
-                      Student Signup
-                      <ArrowRight className="ml-1 h-3 w-3" />
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card> */}
-
-            {/* <Card className="border-electric/30 bg-electric/5 shadow-xl">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-electric text-white">
-                      <Briefcase className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">I want to Teach</h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Create a mentor account and join our vetted marketplace.
-                      </p>
-                    </div>
-                  </div>
-                  <Button asChild size="sm" className="shrink-0">
-                    <Link to="/mentor-signup">Mentor Signup</Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card> */}
-          </div>
-
-          <Card className="shadow-2xl">
-            <CardHeader className="space-y-2 ">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-18 items-center justify-center rounded-2xl text-gradient text-white">
-                  <img src="/logo.png" alt="LINGUA" className="h-15 w-20" />
-                </div>
-                <div>
-                  <CardTitle>Student Login</CardTitle>
-                  <CardDescription>
-                    Log in to your student account to continue learning.
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            {/* <div className="rounded-3xl border border-border bg-background p-4 text-sm text-muted-foreground">
-                    Create a Student account and start learning with verified mentors.
-                  </div> */}
-            <CardContent className="space-y-4">
-              <GoogleButton onClick={() => signInWithGoogle()} loading={loading} />
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
-                </div>
-              </div>
-              <Tabs value={formMode} onValueChange={(value) => setFormMode(value as AuthMode)}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="login">Log in</TabsTrigger>
-                  <TabsTrigger value="signup">Sign up</TabsTrigger>
-                </TabsList>
-                <TabsContent value="login" className="space-y-4">
-                  <form onSubmit={handleLogin} className="space-y-4">
-                    <div>
-                      <Label htmlFor="login-email">Email</Label>
-                      <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="Enter your Email"
-                        autoComplete="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="login-password">Password</Label>
-                      <Input
-                        id="login-password"
-                        type="password"
-                        placeholder="Enter your password"
-                        autoComplete="current-password"
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                      />
-                    </div>
-                    <Button type="submit" className="w-full" disabled={loading}>
-                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Log in"}
-                    </Button>
-                  </form>
-                  {/* <GoogleButton onClick={() => signInWithGoogle("student")} loading={loading} /> */}
-                </TabsContent>
-                <TabsContent value="signup" className="space-y-4">
-                  <form onSubmit={handleSignup} className="space-y-4">
-                    <div>
-                      <Label htmlFor="signup-name">Full name</Label>
-                      <Input
-                        id="signup-name"
-                        placeholder="Enter your Name"
-                        required
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="signup-email">Email</Label>
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        autoComplete="email"
-                        placeholder="Enter your Email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="signup-password">Password</Label>
-                      <Input
-                        id="signup-password"
-                        type="password"
-                        placeholder="Create New password"
-                        autoComplete="new-password"
-                        minLength={6}
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                      />
-                    </div>
-                    {/* group relative w-full h-12 rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-800 shadow-xl transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-70 disabled:shadow-none disabled:active:scale-100 */}
-                    <Button
-                      type="submit"
-                      className="w-full shadow-sm order border-border hover:border-border hover:bg-accent hover:text-foreground hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      disabled={loading}
-                    >
-                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create account"}
-                    </Button>
-                  </form>
-                  <div className="relative">
-                    {/* <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t" />
-                    </div> */}
-                    {/* <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background px-2 text-muted-foreground">
-                        Or continue with
-                      </span>
-                    </div> */}
-                  </div>
-                </TabsContent>
-              </Tabs>
-              <CardDescription className="text-center text-xs">
-                By continuing you agree to our terms.
-              </CardDescription>
-            </CardContent>
-          </Card>
-          <div className="rounded-3xl border border-border bg-background p-6 shadow-xl shadow-slate-900/5">
-            <h2 className="text-base font-semibold">Why Lingua?</h2>
-            <ul className="mt-4 space-y-3 text-sm text-muted-foreground">
-              <li>• Smooth session booking and mentor discovery.</li>
-              <li>• Separate student and mentor accounts.</li>
-            </ul>
-          </div>
+    <div className="min-h-screen bg-[#f2f7fd] px-4 py-8 sm:py-12">
+      <div className="mx-auto max-w-md">
+        <div className="mb-6 text-center">
+          <h1 className="text-2xl font-bold tracking-tight text-[#252b2f]">Suggest Key</h1>
         </div>
+        {formMode === "login" && <LoginView onSwitch={switchMode} qc={qc} />}
+        {formMode === "signup" && <SignupView onSwitch={switchMode} />}
+        {formMode === "signup-verify" && (
+          <OtpVerifyView mode="signup" email={search.email ?? ""} otpId={search.otpId ?? ""} onSwitch={switchMode} qc={qc} />
+        )}
+        {formMode === "forgot" && <ForgotPasswordView onSwitch={switchMode} />}
+        {formMode === "reset-verify" && (
+          <OtpVerifyView mode="password_reset" email={search.email ?? ""} otpId={search.otpId ?? ""} onSwitch={switchMode} qc={qc} />
+        )}
+        {formMode === "reset-complete" && <ResetCompleteView onSwitch={switchMode} />}
+        {formMode === "complete-google" && <CompleteGoogleView onSwitch={switchMode} />}
       </div>
     </div>
+  );
+}
+
+function AuthCard({
+  children,
+  title,
+  description,
+  logo,
+}: {
+  children: React.ReactNode;
+  title: string;
+  description: string;
+  logo?: boolean;
+}) {
+  return (
+    <Card className="border-[#d6dee6] bg-white shadow-sm" style={{ borderRadius: "16px" }}>
+      <CardHeader className="space-y-1 pb-4">
+        {logo && (
+          <div className="flex justify-center mb-2">
+            <img src="/logo.png" alt="Suggest Key" className="h-12 w-12 object-contain" />
+          </div>
+        )}
+        <CardTitle className="text-center text-xl font-bold text-[#252b2f]">{title}</CardTitle>
+        <CardDescription className="text-center text-sm text-[#666e7e]">{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-0">{children}</CardContent>
+    </Card>
+  );
+}
+
+function PasswordInput({
+  value,
+  onChange,
+  placeholder,
+  autoComplete,
+  id,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  autoComplete?: string;
+  id: string;
+}) {
+  const [show, setShow] = useState(false);
+
+  return (
+    <div className="relative">
+      <Input
+        id={id}
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        className="pr-10"
+      />
+      <button
+        type="button"
+        onClick={() => setShow((s) => !s)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#666e7e] hover:text-[#252b2f] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#116eee] focus-visible:ring-offset-2 rounded"
+        aria-label={show ? "Hide password" : "Show password"}
+        tabIndex={0}
+      >
+        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
+  );
+}
+
+function PrimaryButton({
+  loading,
+  children,
+  onClick,
+  type = "submit",
+  disabled,
+  loadingText,
+}: {
+  loading?: boolean;
+  children: React.ReactNode;
+  onClick?: () => void;
+  type?: "submit" | "button";
+  disabled?: boolean;
+  loadingText?: string;
+}) {
+  return (
+    <Button
+      type={type}
+      disabled={disabled || loading}
+      className="w-full bg-[#11ee92] text-[#252b2f] hover:bg-[#0ed47f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#116eee] focus-visible:ring-offset-2"
+      style={{ borderRadius: "45px" }}
+      onClick={onClick}
+    >
+      {loading && loadingText ? loadingText : (loading ? <Loader2 className="h-4 w-4 animate-spin" /> : children)}
+    </Button>
   );
 }
 
@@ -399,20 +200,862 @@ function getSignupErrorMessage(error: unknown): string {
   const message = String(value.message ?? "").toLowerCase();
 
   if (code.includes("user_already_exists") || message.includes("already registered"))
-    return "An account with this email already exists.";
+    return "An account with this email already exists. Try logging in instead.";
   if (code.includes("invalid_email") || message.includes("invalid email"))
     return "Enter a valid email address.";
   if (code.includes("weak_password") || message.includes("password"))
     return "Choose a stronger password with at least 6 characters.";
-  if (message.includes("email confirmation") || message.includes("confirm your email"))
-    return "Check your email to confirm your account.";
-  if (
-    code === "42501" ||
-    message.includes("row-level security") ||
-    message.includes("permission denied")
-  )
+  if (code === "42501" || message.includes("row-level security") || message.includes("permission denied"))
     return "Your account was created, but permission to finish your profile was denied.";
   if (message.includes("network") || message.includes("failed to fetch"))
     return "We could not connect to the server. Check your connection and try again.";
   return "We could not create your account. Please try again.";
+}
+
+/* ─── Login View ─── */
+function LoginView({
+  onSwitch,
+  qc,
+}: {
+  onSwitch: (mode: AuthMode, extra?: { otpId?: string; email?: string }) => void;
+  qc: ReturnType<typeof useQueryClient>;
+}) {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setErrorMsg("");
+    if (!email || !password) {
+      toast.error("Enter your email and password to continue.");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrorMsg("Enter a valid email address.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      if (!data.user) throw new Error("Login succeeded, but no user session was returned.");
+
+      toast.success("Welcome back!");
+      await qc.invalidateQueries();
+
+      const { data: roles, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.user.id);
+
+      if (rolesError) {
+        console.error("Redirect lookup failed", rolesError);
+        toast.error("Unable to determine your account role. Please try signing in again.");
+        return;
+      }
+
+      const fetchedRoles = (roles ?? []).map((r) => r.role as AppRole);
+      const activeRole = getActiveRole(Array.from(new Set(fetchedRoles)));
+
+      if (!activeRole) {
+        console.error("No role found for user", data.user.id);
+        toast.error("No account role found. Please contact support.");
+        return;
+      }
+
+      const destination = getDashboardRoute(activeRole);
+      navigate({ to: destination });
+    } catch (error) {
+      console.error("Login failed", error);
+      setErrorMsg("Email or password is incorrect.");
+      toast.error("Email or password is incorrect.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <AuthCard title="Log in" description="Enter your credentials to continue" logo>
+      <form onSubmit={handleLogin} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="login-email">Email</Label>
+          <Input
+            id="login-email"
+            type="email"
+            placeholder="Enter your email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="login-password">Password</Label>
+          </div>
+          <PasswordInput
+            id="login-password"
+            value={password}
+            onChange={setPassword}
+            placeholder="Enter your password"
+            autoComplete="current-password"
+          />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => onSwitch("forgot")}
+              className="text-[13px] font-bold text-[#116eee] hover:underline"
+            >
+              Forgot password?
+            </button>
+          </div>
+        </div>
+        {errorMsg && (
+          <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-[#252b2f] font-medium" role="alert">
+            {errorMsg}
+          </div>
+        )}
+        <PrimaryButton loading={loading}>Log in</PrimaryButton>
+      </form>
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-[#d6dee6]" />
+        </div>
+        <div className="relative flex justify-center text-xs">
+          <span className="bg-white px-2 text-[#666e7e]">Or continue with</span>
+        </div>
+      </div>
+      <GoogleButton onClick={() => signInWithGoogle()} loading={loading} />
+      <div className="mt-4 text-center text-xs text-[#666e7e]">
+        Don&apos;t have an account?{" "}
+        <button
+          type="button"
+          onClick={() => onSwitch("signup")}
+          className="font-bold text-[#116eee] hover:underline"
+        >
+          Sign up
+        </button>
+      </div>
+    </AuthCard>
+  );
+}
+
+/* ─── Signup View ─── */
+function SignupView({
+  onSwitch,
+}: {
+  onSwitch: (mode: AuthMode, extra?: { otpId?: string; email?: string }) => void;
+}) {
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function handleSignup(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setErrorMsg("");
+    setPasswordError("");
+
+    if (!fullName.trim() || !email || !password || !confirmPassword) {
+      toast.error("Fill in all fields to continue.");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrorMsg("Enter a valid email address.");
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error("Choose a stronger password with at least 6 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setPasswordError("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth/signup/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fullName, email, password, confirmPassword }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        const msg = result.error === "cooldown"
+          ? "Please wait a moment before requesting another code."
+          : "We could not send the verification code. Please try again.";
+        setErrorMsg(msg);
+        toast.error(msg);
+        return;
+      }
+
+      if (result.alreadyExists) {
+        const msg = "An account with this email already exists. Try logging in instead.";
+        setErrorMsg(msg);
+        toast.error(msg);
+        return;
+      }
+
+      toast.success("Verification code sent!");
+      onSwitch("signup-verify", { otpId: result.otpId, email: result.email });
+    } catch (error) {
+      console.error("Signup request failed", error);
+      const msg = "We could not connect to the server. Check your connection and try again.";
+      setErrorMsg(msg);
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <AuthCard title="Create account" description="Sign up to get started">
+      <form onSubmit={handleSignup} className="space-y-4" noValidate>
+        <div className="space-y-1.5">
+          <Label htmlFor="signup-name">Full name</Label>
+          <Input
+            id="signup-name"
+            placeholder="Enter your name"
+            autoComplete="name"
+            required
+            value={fullName}
+            onChange={(e) => {
+              setFullName(e.target.value);
+              setErrorMsg("");
+            }}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="signup-email">Email</Label>
+          <Input
+            id="signup-email"
+            type="email"
+            placeholder="Enter your email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setErrorMsg("");
+            }}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="signup-password">Password</Label>
+          <PasswordInput
+            id="signup-password"
+            value={password}
+            onChange={(v) => {
+              setPassword(v);
+              if (passwordError && v === confirmPassword) {
+                setPasswordError("");
+              }
+            }}
+            placeholder="Create new password"
+            autoComplete="new-password"
+          />
+          <p className="text-xs text-[#666e7e]">Password must contain at least 6 characters.</p>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="signup-confirm-password">Confirm password</Label>
+          <PasswordInput
+            id="signup-confirm-password"
+            value={confirmPassword}
+            onChange={(v) => {
+              setConfirmPassword(v);
+              if (passwordError && v === password) {
+                setPasswordError("");
+              }
+            }}
+            placeholder="Confirm your password"
+            autoComplete="new-password"
+          />
+          {passwordError && (
+            <p className="text-sm font-bold text-[#252b2f] bg-red-50 rounded px-3 py-2" role="alert">
+              {passwordError}
+            </p>
+          )}
+        </div>
+        {errorMsg && (
+          <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-[#252b2f] font-medium" role="alert">
+            {errorMsg}
+          </div>
+        )}
+        <PrimaryButton loading={loading} loadingText="Creating account...">Create account</PrimaryButton>
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-[#d6dee6]" />
+          </div>
+          <div className="relative flex justify-center text-xs">
+            <span className="bg-white px-2 text-[#666e7e]">Or continue with</span>
+          </div>
+        </div>
+        <GoogleButton onClick={() => signInWithGoogle("student")} loading={loading} />
+        <p className="text-center text-xs text-[#666e7e]">
+          Already have an account?{" "}
+          <button
+            type="button"
+            onClick={() => onSwitch("login")}
+            className="font-bold text-[#116eee] hover:underline"
+          >
+            Log in
+          </button>
+        </p>
+      </form>
+    </AuthCard>
+  );
+}
+
+/* ─── OTP Verification View (signup + password_reset) ─── */
+function OtpVerifyView({
+  mode,
+  email,
+  otpId,
+  onSwitch,
+  qc,
+}: {
+  mode: "signup" | "password_reset";
+  email: string;
+  otpId: string;
+  onSwitch: (mode: AuthMode, extra?: { otpId?: string; email?: string }) => void;
+  qc: ReturnType<typeof useQueryClient>;
+}) {
+  const navigate = useNavigate();
+  const [otp, setOtp] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(60);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [serverError, setServerError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setCooldown((c) => {
+        if (c <= 1) {
+          if (cooldownRef.current) clearInterval(cooldownRef.current);
+          cooldownRef.current = null;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => {
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+    };
+  }, [otpId]);
+
+  const isSignup = mode === "signup";
+
+  async function handleVerify() {
+    if (!otp || otp.length !== 6) return;
+    setLoading(true);
+    setErrorMsg("");
+    setServerError("");
+    try {
+      const response = await fetch("/api/auth/" + (isSignup ? "signup/verify" : "password-reset/verify"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otpId, otp }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        if (result.error === "max_attempts") {
+          setErrorMsg("Too many incorrect attempts. Please request a new code.");
+          return;
+        }
+        if (result.error === "server_error") {
+          setServerError("We could not verify your code. Please try again.");
+          return;
+        }
+        setErrorMsg("Invalid or expired code.");
+        return;
+      }
+
+      setSuccess(true);
+      toast.success(isSignup ? "Email verified!" : "Code verified.");
+
+      if (isSignup) {
+        await qc.invalidateQueries();
+        navigate({ to: "/auth", search: { mode: "login" } });
+      } else {
+        onSwitch("reset-complete", { email });
+      }
+    } catch (error) {
+      console.error("OTP verify failed", error);
+      setServerError("We could not connect to the server. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResend() {
+    if (cooldown > 0) return;
+    setResendLoading(true);
+    setErrorMsg("");
+    setServerError("");
+    try {
+      const response = await fetch("/api/auth/" + (isSignup ? "signup/request" : "password-reset/request"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const result = await response.json();
+      if (response.ok && result.success && result.otpId) {
+        setCooldown(60);
+        setOtp("");
+        toast.success("A new code has been sent.");
+        onSwitch(isSignup ? "signup-verify" : "reset-verify", { otpId: result.otpId, email: result.email ?? email });
+      } else {
+        setServerError("We could not resend the code. Please try again later.");
+      }
+    } catch (error) {
+      console.error("Resend failed", error);
+      setServerError("We could not resend the code. Please try again later.");
+    } finally {
+      setResendLoading(false);
+    }
+  }
+
+  if (success) {
+    return (
+      <AuthCard title="Code verified" description="">
+        <div className="space-y-4 text-center">
+          <svg className="mx-auto h-12 w-12 text-[#11ee92]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          <p className="text-sm font-medium text-[#252b2f]">
+            {isSignup ? "Your email has been verified. You can now log in." : "Verify your new password next."}
+          </p>
+        </div>
+      </AuthCard>
+    );
+  }
+
+  return (
+    <AuthCard title="Verify your email" description="Enter the 6-digit code we sent.">
+      <div className="space-y-4">
+        <p className="text-sm text-[#666e7e]">
+          We sent a 6-digit code to <span className="font-medium text-[#252b2f]">{email}</span>. It expires in 10 minutes.
+        </p>
+        <div className="flex justify-center">
+          <InputOTP maxLength={6} value={otp} onChange={setOtp} disabled={loading} autoFocus>
+            <InputOTPGroup>
+              <InputOTPSlot index={0} />
+              <InputOTPSlot index={1} />
+              <InputOTPSlot index={2} />
+              <InputOTPSlot index={3} />
+              <InputOTPSlot index={4} />
+              <InputOTPSlot index={5} />
+            </InputOTPGroup>
+          </InputOTP>
+        </div>
+        {errorMsg && (
+          <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-[#252b2f] font-medium" role="alert">
+            {errorMsg}
+          </div>
+        )}
+        {serverError && (
+          <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-[#252b2f] font-medium" role="alert">
+            {serverError}
+          </div>
+        )}
+        <PrimaryButton loading={loading} loadingText="Verifying..." onClick={handleVerify}>
+          Verify code
+        </PrimaryButton>
+        <div className="text-center text-sm text-[#666e7e]">
+          Didn&apos;t get a code?{" "}
+          <button
+            type="button"
+            disabled={resendLoading || cooldown > 0}
+            onClick={handleResend}
+            className={`font-bold ${cooldown > 0 ? "text-[#9aa3b2]" : "text-[#116eee] hover:underline"}`}
+          >
+            {resendLoading ? "Sending..." : cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
+          </button>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full text-[#252b2f] hover:bg-accent hover:text-accent-foreground"
+          onClick={() => onSwitch("login")}
+          style={{ borderRadius: "45px" }}
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Back to login
+        </Button>
+      </div>
+    </AuthCard>
+  );
+}
+
+/* ─── Forgot Password View ─── */
+function ForgotPasswordView({
+  onSwitch,
+}: {
+  onSwitch: (mode: AuthMode, extra?: { otpId?: string; email?: string }) => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function handleSendReset(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setErrorMsg("");
+    if (!email) {
+      toast.error("Enter your email to continue.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth/password-reset/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        setErrorMsg("We couldn't send the reset code. Please try again.");
+        toast.error("We couldn't send the reset code. Please try again.");
+        return;
+      }
+      toast.success("Check your email");
+      onSwitch("reset-verify", { email });
+    } catch (error) {
+      console.error("Reset request failed", error);
+      setErrorMsg("We couldn't send the reset code. Please try again.");
+      toast.error("We couldn't send the reset code. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <AuthCard title="Reset your password" description="Enter the email associated with your account.">
+      <form onSubmit={handleSendReset} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="reset-email">Email</Label>
+          <Input
+            id="reset-email"
+            type="email"
+            placeholder="Enter your email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+        {errorMsg && (
+          <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-[#252b2f] font-medium" role="alert">
+            {errorMsg}
+          </div>
+        )}
+        <PrimaryButton loading={loading} loadingText="Sending...">Send reset code</PrimaryButton>
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full text-[#252b2f] hover:bg-accent hover:text-accent-foreground"
+          onClick={() => onSwitch("login")}
+          style={{ borderRadius: "45px" }}
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Back to login
+        </Button>
+      </form>
+    </AuthCard>
+  );
+}
+
+/* ─── Forgot Password View ─── */
+function ResetCompleteView({
+  onSwitch,
+}: {
+  onSwitch: (mode: AuthMode, extra?: { otpId?: string; email?: string }) => void;
+}) {
+  const navigate = useNavigate();
+  const search = Route.useSearch();
+  const resetToken = search.otpId ?? "";
+  const email = search.email ?? "";
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [expired, setExpired] = useState(false);
+  const hasChecked = useRef(false);
+
+  useEffect(() => {
+    if (hasChecked.current) return;
+    hasChecked.current = true;
+    if (!resetToken) {
+      setExpired(true);
+    }
+  }, [resetToken]);
+
+  async function handleReset(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setErrorMsg("");
+    setPasswordError("");
+
+    if (!newPassword || !confirmPassword) {
+      toast.error("Fill in both password fields.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error("Choose a stronger password with at least 6 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth/password-reset/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resetToken, email, newPassword, confirmPassword }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        if (result.error && (String(result.error).includes("expired") || String(result.error).includes("used"))) {
+          setExpired(true);
+          return;
+        }
+        setErrorMsg(String(result.error || "Unable to reset your password. Please request a new reset and try again."));
+        toast.error(String(result.error || "Unable to reset your password. Please request a new reset and try again."));
+        return;
+      }
+      setSuccess(true);
+      toast.success("Password updated successfully.");
+    } catch (error) {
+      console.error("Reset failed", error);
+      setErrorMsg("Unable to reset your password. Please request a new reset and try again.");
+      toast.error("Unable to reset your password. Please request a new reset and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (success) {
+    return (
+      <AuthCard title="Password updated successfully" description="">
+        <div className="space-y-4 text-center">
+          <svg className="mx-auto h-12 w-12 text-[#11ee92]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          <p className="text-sm font-medium text-[#252b2f]">Password updated successfully.</p>
+          <p className="text-sm text-[#666e7e]">You can now log in with your email and new password.</p>
+          <PrimaryButton type="button" onClick={() => navigate({ to: "/auth", search: { mode: "login" } })}>
+            Back to login
+          </PrimaryButton>
+        </div>
+      </AuthCard>
+    );
+  }
+
+  if (expired) {
+    return (
+      <AuthCard title="Link expired" description="">
+        <div className="space-y-4 text-center">
+          <p className="text-sm text-[#252b2f]">
+            This reset link has expired or already been used. Please request a new password reset.
+          </p>
+          <PrimaryButton type="button" onClick={() => onSwitch("forgot")}>
+            Request new reset
+          </PrimaryButton>
+        </div>
+      </AuthCard>
+    );
+  }
+
+  return (
+    <AuthCard title="Reset your password" description="Enter a new password">
+      <form onSubmit={handleReset} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="reset-new-password">New password</Label>
+          <PasswordInput
+            id="reset-new-password"
+            value={newPassword}
+            onChange={(v) => {
+              setNewPassword(v);
+              if (passwordError && v === confirmPassword) {
+                setPasswordError("");
+              }
+            }}
+            placeholder="Enter new password"
+            autoComplete="new-password"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="reset-confirm-password">Confirm password</Label>
+          <PasswordInput
+            id="reset-confirm-password"
+            value={confirmPassword}
+            onChange={(v) => {
+              setConfirmPassword(v);
+              if (passwordError && v === newPassword) {
+                setPasswordError("");
+              }
+            }}
+            placeholder="Confirm new password"
+            autoComplete="new-password"
+          />
+          {passwordError && (
+            <p className="text-sm font-bold text-[#252b2f] bg-red-50 rounded px-3 py-2" role="alert">
+              {passwordError}
+            </p>
+          )}
+        </div>
+        {errorMsg && (
+          <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-[#252b2f] font-medium" role="alert">
+            {errorMsg}
+          </div>
+        )}
+        <PrimaryButton loading={loading} loadingText="Updating password...">Update password</PrimaryButton>
+      </form>
+    </AuthCard>
+  );
+}
+
+/* ─── Complete Google Account View ─── */
+function CompleteGoogleView({
+  onSwitch,
+}: {
+  onSwitch: (mode: AuthMode, extra?: { otpId?: string; email?: string }) => void;
+}) {
+  const navigate = useNavigate();
+  const [fullName, setFullName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function handleComplete(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setErrorMsg("");
+    setPasswordError("");
+
+    if (!fullName.trim()) {
+      toast.error("Enter your name to continue.");
+      return;
+    }
+
+    if (password && password.length < 6) {
+      toast.error("Choose a stronger password with at least 6 characters.");
+      return;
+    }
+
+    if (password && password !== confirmPassword) {
+      setPasswordError("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        user_metadata: { full_name: fullName.trim() },
+        ...(password ? { password } : {}),
+      });
+      if (error) throw error;
+      if (!data.user) throw new Error("Account completion failed.");
+
+      toast.success("Account ready!");
+      navigate({ to: "/seeker/home" });
+    } catch (error) {
+      console.error("Google completion failed", error);
+      setErrorMsg("We could not complete your account. Please try again.");
+      toast.error("We could not complete your account. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <AuthCard title="Complete your account" description="Add your name and an optional password.">
+      <form onSubmit={handleComplete} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="google-name">Full name</Label>
+          <Input
+            id="google-name"
+            placeholder="Enter your name"
+            autoComplete="name"
+            required
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="google-password">Password (optional)</Label>
+          <PasswordInput
+            id="google-password"
+            value={password}
+            onChange={(v) => {
+              setPassword(v);
+              if (passwordError && v === confirmPassword) {
+                setPasswordError("");
+              }
+            }}
+            placeholder="Create a password"
+            autoComplete="new-password"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="google-confirm-password">Confirm password</Label>
+          <PasswordInput
+            id="google-confirm-password"
+            value={confirmPassword}
+            onChange={(v) => {
+              setConfirmPassword(v);
+              if (passwordError && v === password) {
+                setPasswordError("");
+              }
+            }}
+            placeholder="Confirm your password"
+            autoComplete="new-password"
+          />
+          {passwordError && (
+            <p className="text-sm font-bold text-[#252b2f] bg-red-50 rounded px-3 py-2" role="alert">
+              {passwordError}
+            </p>
+          )}
+        </div>
+        {errorMsg && (
+          <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-[#252b2f] font-medium" role="alert">
+            {errorMsg}
+          </div>
+        )}
+        <PrimaryButton loading={loading} loadingText="Completing...">Complete account</PrimaryButton>
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full text-[#252b2f] hover:bg-accent hover:text-accent-foreground"
+          onClick={() => onSwitch("login")}
+          style={{ borderRadius: "45px" }}
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Back to login
+        </Button>
+      </form>
+    </AuthCard>
+  );
 }

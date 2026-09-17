@@ -93,8 +93,8 @@ export function StudentMetrics({
       value: stats.totalSessionsUsed,
       description: "Across active subscriptions",
       icon: Activity,
-      color: "text-indigo-600",
-      bg: "bg-indigo-50",
+      color: "text-indigo-600 dark:text-indigo-400",
+      bg: "bg-indigo-50 dark:bg-indigo-500/10",
       to: "/admin/students?filter=all&sort=most_sessions",
     },
     {
@@ -102,8 +102,8 @@ export function StudentMetrics({
       value: Math.max(0, (stats.totalStudents || 0) - (stats.withActiveSubscription || 0)),
       description: "Students without an active plan",
       icon: UserX,
-      color: "text-slate-600",
-      bg: "bg-slate-100",
+      color: "text-muted-foreground",
+      bg: "bg-muted",
       to: "/admin/students?filter=no_subscription",
     },
   ];

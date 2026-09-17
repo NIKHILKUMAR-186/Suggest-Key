@@ -20,7 +20,7 @@ const priorityConfig = {
     ctaClass: "mentor-action-card-cta-urgent",
   },
   attention: {
-    iconBg: "bg-amber-50 text-amber-700",
+    iconBg: "badge-warning",
     ctaClass: "mentor-action-card-cta",
   },
   suggested: {

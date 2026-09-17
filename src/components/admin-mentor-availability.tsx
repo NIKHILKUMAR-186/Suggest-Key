@@ -246,7 +246,7 @@ export function AdminMentorAvailability({
                       ) : (
                         <Badge
                           variant="outline"
-                          className="text-[10px] text-green-600 border-green-200 bg-green-50"
+                          className="text-[10px] text-green-600 dark:text-green-400 border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/10"
                         >
                           Active
                         </Badge>

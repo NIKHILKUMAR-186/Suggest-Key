@@ -36,7 +36,7 @@ function LanguageTags({ languages }: { languages: string[] }) {
       {languages.slice(0, 3).map((l) => (
         <span
           key={l}
-          className="inline-block rounded bg-slate-100 px-1.5 py-0.25 text-xs text-slate-700"
+          className="inline-block rounded badge-neutral rounded px-1.5 py-0.25 text-xs"
         >
           {l}
         </span>
@@ -54,8 +54,8 @@ function AvailabilityIndicator({ today, slots }: { today: boolean; slots: number
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium",
         today
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-          : "border-slate-200 bg-slate-100 text-slate-600",
+          ? "badge-success"
+          : "badge-neutral",
       )}
       title={today ? "Available today" : "Not available today"}
     >

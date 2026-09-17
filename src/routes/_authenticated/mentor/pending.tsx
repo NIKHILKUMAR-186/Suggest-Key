@@ -151,23 +151,23 @@ function MentorPendingDashboard() {
     status === "not_started" ? "Not Started" : (APPLICATION_STATUS_LABELS[status] ?? status);
 
   const statusConfig: Record<string, { color: string; icon: React.ElementType; text: string }> = {
-    not_started: { color: "bg-slate-100 text-slate-700", icon: FileText, text: "Not Started" },
-    draft: { color: "bg-slate-100 text-slate-700", icon: FileText, text: "Draft" },
-    submitted: { color: "bg-blue-100 text-blue-700", icon: Clock, text: "Submitted" },
-    under_review: { color: "bg-amber-100 text-amber-700", icon: Clock, text: "Under Review" },
+    not_started: { color: "badge-neutral border", icon: FileText, text: "Not Started" },
+    draft: { color: "badge-neutral border", icon: FileText, text: "Draft" },
+    submitted: { color: "badge-info border", icon: Clock, text: "Submitted" },
+    under_review: { color: "badge-warning border", icon: Clock, text: "Under Review" },
     interview_scheduled: {
-      color: "bg-purple-100 text-purple-700",
+      color: "badge-purple border",
       icon: Clock,
       text: "Interview Scheduled",
     },
     interview_completed: {
-      color: "bg-purple-100 text-purple-700",
+      color: "badge-purple border",
       icon: CheckCircle2,
       text: "Interview Completed",
     },
-    approved: { color: "bg-green-100 text-green-700", icon: CheckCircle2, text: "Approved" },
-    rejected: { color: "bg-red-100 text-red-700", icon: XCircle, text: "Rejected" },
-    active: { color: "bg-green-100 text-green-700", icon: CheckCircle2, text: "Active" },
+    approved: { color: "badge-success border", icon: CheckCircle2, text: "Approved" },
+    rejected: { color: "badge-danger border", icon: XCircle, text: "Rejected" },
+    active: { color: "badge-success border", icon: CheckCircle2, text: "Active" },
   };
 
   const config = statusConfig[status] ?? statusConfig.not_started;
@@ -230,7 +230,7 @@ function MentorPendingDashboard() {
                     Account Status
                   </p>
                   <div className="mt-2 flex items-center gap-2">
-                    <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+                    <Badge className="badge-warning border hover:bg-transparent">
                       <Clock className="mr-1 h-3 w-3" />
                       Pending Verification
                     </Badge>

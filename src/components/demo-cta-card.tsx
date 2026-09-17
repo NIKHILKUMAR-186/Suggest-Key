@@ -46,8 +46,8 @@ export function DemoCtaCard({ hasDemoBooking, demoStatus, demoUsed }: DemoCtaCar
         <div className="p-6">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100">
-                <Clock className="h-6 w-6 text-amber-600" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-500/15">
+                <Clock className="h-6 w-6 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
                 <h3 className="font-display text-lg font-semibold">Demo Request Received</h3>

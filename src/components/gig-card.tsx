@@ -40,10 +40,10 @@ export function GigCard({
 }: GigCardProps) {
   const lang = LANGUAGES.find((l) => l.code === gig.language);
   const levelColors: Record<string, string> = {
-    beginner: "bg-green-100 text-green-700",
-    intermediate: "bg-yellow-100 text-yellow-700",
-    advanced: "bg-red-100 text-red-700",
-    all: "bg-blue-100 text-blue-700",
+    beginner: "badge-success border",
+    intermediate: "badge-warning border",
+    advanced: "badge-danger border",
+    all: "badge-info border",
   };
 
   return (

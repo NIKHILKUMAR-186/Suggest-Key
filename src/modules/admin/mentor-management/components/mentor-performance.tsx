@@ -63,19 +63,19 @@ export function MentorPerformance({ mentor }: { mentor: MentorDetail }) {
             label="Total sessions"
             value={b.total}
             icon={BarChart3}
-            color="bg-slate-100 text-slate-700"
+            color="bg-muted text-muted-foreground"
           />
           <StatMini
             label="Completed"
             value={b.completed}
             icon={CheckCircle2}
-            color="bg-green-50 text-green-700"
+            color="badge-success"
           />
           <StatMini
             label="Cancelled"
             value={b.cancelled}
             icon={XCircle}
-            color="bg-red-50 text-red-700"
+            color="badge-danger"
           />
           <StatMini
             label="Confirmed"
@@ -89,10 +89,10 @@ export function MentorPerformance({ mentor }: { mentor: MentorDetail }) {
             icon={CheckCircle2}
             color={
               p.completionRate >= 80
-                ? "bg-green-50 text-green-700"
+                ? "badge-success"
                 : p.completionRate >= 50
                   ? "bg-amber-50 text-amber-700"
-                  : "bg-red-50 text-red-700"
+                  : "badge-danger"
             }
           />
           <StatMini
@@ -100,7 +100,7 @@ export function MentorPerformance({ mentor }: { mentor: MentorDetail }) {
             value={b.total > 0 ? `${p.cancellationRate}%` : "—"}
             icon={XCircle}
             color={
-              p.cancellationRate <= 20 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+              p.cancellationRate <= 20 ? "badge-success" : "badge-danger"
             }
           />
         </CardContent>

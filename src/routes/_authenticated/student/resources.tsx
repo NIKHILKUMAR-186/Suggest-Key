@@ -162,8 +162,8 @@ function Resources() {
           <Card className="border-amber-500/20 bg-gradient-to-br from-amber-50/50 to-background">
             <CardContent className="flex flex-col gap-4 p-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100">
-                  <Sparkles className="h-6 w-6 text-amber-600" />
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-500/15">
+                  <Sparkles className="h-6 w-6 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div>
                   <h3 className="font-display text-lg font-semibold">Choose a plan</h3>

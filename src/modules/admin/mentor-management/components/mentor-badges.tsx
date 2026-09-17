@@ -19,42 +19,42 @@ const HEALTH_VARIANT: Record<string, { label: string; color: string; icon: React
   good: { label: "Good", color: "text-blue-700 bg-blue-50 border-blue-200", icon: ShieldCheck },
   needs_attention: {
     label: "Needs attention",
-    color: "text-amber-700 bg-amber-50 border-amber-200",
+    color: "badge-warning",
     icon: ShieldQuestion,
   },
   incomplete: {
     label: "Incomplete",
-    color: "text-orange-700 bg-orange-50 border-orange-200",
+    color: "badge-warning",
     icon: ShieldX,
   },
   inactive: {
     label: "Inactive",
-    color: "text-slate-700 bg-slate-100 border-slate-200",
+    color: "badge-neutral",
     icon: PauseCircle,
   },
 };
 
 const STATUS_VARIANT: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  pending: { label: "Pending", color: "text-amber-700 bg-amber-50 border-amber-200", icon: Clock },
+  pending: { label: "Pending", color: "badge-warning", icon: Clock },
   approved: {
     label: "Approved",
-    color: "text-green-700 bg-green-50 border-green-200",
+    color: "badge-success",
     icon: CheckCircle2,
   },
   active: {
     label: "Active",
-    color: "text-green-700 bg-green-50 border-green-200",
+    color: "badge-success",
     icon: CheckCircle2,
   },
-  rejected: { label: "Rejected", color: "text-red-700 bg-red-50 border-red-200", icon: ShieldX },
+  rejected: { label: "Rejected", color: "badge-danger", icon: ShieldX },
   suspended: {
     label: "Suspended",
-    color: "text-red-700 bg-red-50 border-red-200",
+    color: "badge-danger",
     icon: PauseCircle,
   },
   inactive: {
     label: "Inactive",
-    color: "text-slate-700 bg-slate-100 border-slate-200",
+    color: "badge-neutral",
     icon: PauseCircle,
   },
 };
@@ -112,12 +112,12 @@ export function VerificationBadge({
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
         verified
-          ? "text-purple-700 bg-purple-50 border-purple-200"
-          : "text-slate-600 bg-slate-100 border-slate-200",
+          ? "badge-purple"
+          : "badge-neutral",
         className,
       )}
     >
-      <ShieldCheck className={cn("h-3 w-3", !verified && "text-slate-400")} />
+      <ShieldCheck className={cn("h-3 w-3", !verified && "text-muted-foreground")} />
       {verified ? "Verified" : "Unverified"}
     </span>
   );

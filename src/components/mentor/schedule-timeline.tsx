@@ -1,0 +1,68 @@
+import { type ReactNode } from "react";
+import { cn } from "@/lib/utils";
+
+interface TimelineItem {
+  time: string;
+  title: string;
+  subtitle?: string;
+  status?: "available" | "booked" | "busy" | "break";
+  action?: ReactNode;
+}
+
+interface ScheduleTimelineProps {
+  items: TimelineItem[];
+  className?: string;
+  emptyMessage?: string;
+}
+
+const statusConfig = {
+  available: { dot: "bg-jelly-green", label: "Available" },
+  booked: { dot: "bg-electric-iris", label: "Booked" },
+  busy: { dot: "bg-hi-yellow", label: "Busy" },
+  break: { dot: "bg-muted-foreground", label: "Break" },
+};
+
+export function ScheduleTimeline({
+  items,
+  className,
+  emptyMessage = "No items scheduled.",
+}: ScheduleTimelineProps) {
+  if (items.length === 0) {
+    return (
+      <div className="mentor-empty-state">
+        <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("mentor-timeline", className)}>
+      {items.map((item, idx) => {
+        const config = statusConfig[item.status || "available"];
+        return (
+          <div key={idx} className="mentor-timeline-item">
+            <div className="flex flex-col items-center">
+              <span className="text-xs font-medium text-muted-foreground tabular-nums w-12 shrink-0">
+                {item.time}
+              </span>
+              <div className="mt-1.5 flex h-2.5 w-2.5 shrink-0 items-center justify-center">
+                <span className={cn("h-2 w-2 rounded-full", config.dot)} />
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">{item.title}</p>
+                  {item.subtitle && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">{item.subtitle}</p>
+                  )}
+                </div>
+                {item.action && <div className="shrink-0">{item.action}</div>}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

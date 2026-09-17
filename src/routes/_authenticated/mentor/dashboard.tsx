@@ -13,6 +13,8 @@ import { MentorQuickAction } from "@/components/mentor-design/MentorQuickAction"
 import { MentorPageContainer } from "@/components/mentor-design/MentorPageContainer";
 import { MentorStatusBadge } from "@/components/mentor-design/MentorStatusBadge";
 import { MentorAvatar } from "@/components/mentor-design/MentorAvatar";
+import { ScheduleTimeline } from "@/components/mentor/schedule-timeline";
+import { SessionCard } from "@/components/mentor/session-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
@@ -40,6 +42,7 @@ import {
 import { format, isToday, parseISO, differenceInMinutes, addMinutes } from "date-fns";
 import { getProfileCompletionPercent, type ProfileCompletionValues } from "@/lib/profile";
 import { useAvailability } from "@/hooks/use-availability";
+import { useMentorPendingBookings } from "@/hooks/use-mentor-bookings";
 
 export const Route = createFileRoute("/_authenticated/mentor/dashboard")({
   component: MentorDashboard,

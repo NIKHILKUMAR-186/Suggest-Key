@@ -31,7 +31,7 @@
     root.classList.add(theme);
     root.style.colorScheme = theme;
     // Paint the correct page background before first render — no flash.
-    document.documentElement.style.backgroundColor = theme === 'dark' ? '#000000' : '#faf7f1';
+    document.documentElement.style.backgroundColor = theme === 'dark' ? '#0e1114' : '#f2f7fd';
   }
 
   function init() {
@@ -41,7 +41,7 @@
 
     const themeColor = document.querySelector('meta[name="theme-color"]');
     if (themeColor) {
-      themeColor.setAttribute('content', theme === 'dark' ? '#000000' : '#faf7f1');
+      themeColor.setAttribute('content', theme === 'dark' ? '#0e1114' : '#f2f7fd');
     }
   }
 

@@ -182,10 +182,10 @@ function CheckoutPage() {
 
             {step === "confirmation" && (
               <div className="space-y-6">
-                <div className="rounded-3xl border-2 border-green-200 bg-green-50 p-8 text-center">
-                  <CheckCircle2 className="mx-auto h-12 w-12 text-green-600" />
-                  <h1 className="mt-4 text-2xl font-bold text-green-900">Payment Successful!</h1>
-                  <p className="mt-2 text-green-700">
+                <div className="rounded-3xl border-2 border-green-200 bg-green-50 dark:border-green-500/30 dark:bg-green-500/10 p-8 text-center">
+                  <CheckCircle2 className="mx-auto h-12 w-12 text-green-600 dark:text-green-400" />
+                  <h1 className="mt-4 text-2xl font-bold text-green-900 dark:text-green-300">Payment Successful!</h1>
+                  <p className="mt-2 text-green-700 dark:text-green-400">
                     Your subscription is now active. Happy learning!
                   </p>
                 </div>

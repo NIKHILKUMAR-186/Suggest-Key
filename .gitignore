@@ -17,3 +17,6 @@ coverage/
 .env
 .env.*
 !.env.example
+
+*.tanstack
+supabase/.temp
